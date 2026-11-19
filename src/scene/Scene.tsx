@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { Album3D } from "./Album3D";
 import { AtmosphereRig } from "./AtmosphereRig";
 import { Character } from "./Character";
-import { CameraZoom, Interact } from "./Interact";
+import { CameraFollow, Interact } from "./Interact";
 import { Particles } from "./Particles";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
@@ -25,7 +25,7 @@ export function Scene() {
         <Character />
         <Pet />
         <Interact />
-        <CameraZoom />
+        <CameraFollow />
         <Particles />
         {import.meta.env.DEV && <DevHandle />}
       </Suspense>

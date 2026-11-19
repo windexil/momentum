@@ -90,6 +90,8 @@ export function Character() {
       lie: 0,
       desk: 0,
       drink: 0,
+      pull: 0,
+      turnFirst: false,
       carry: 0, // 0 — наушники на столике, 1 — у персонажа
       onHead: 0, // 0 — на шее, 1 — на голове
       hold: 0,
@@ -126,8 +128,8 @@ export function Character() {
       hp: clay(DEFAULT.hp, 0.35),
       hpPad: new THREE.MeshStandardMaterial({ color: DEFAULT.pad, roughness: 0.55, emissive: DEFAULT.pad, emissiveIntensity: 0 }),
       earInner: clay("#ffb3c7", 0.6),
-      mug: clay("#f6f1ea", 0.4),
-      cocoa: clay("#7a4a2e", 0.3),
+      mug: new THREE.MeshStandardMaterial({ color: "#f6f1ea", roughness: 0.4, side: THREE.DoubleSide }),
+      cocoa: new THREE.MeshStandardMaterial({ color: "#6b3a22", roughness: 0.25, emissive: "#3a1a0a", emissiveIntensity: 0.25 }),
     }),
     [],
   );
@@ -218,6 +220,7 @@ export function Character() {
             st.stuck = 0;
             st.replans = 0;
             st.lastDist = Infinity;
+            st.turnFirst = true;
           }
           while (st.path.length > 1 && Math.hypot(st.path[0].x - st.pos.x, st.path[0].z - st.pos.z) < 0.18) {
             st.path.shift();
@@ -230,7 +233,11 @@ export function Character() {
           if (last && dist < (step.tol ?? 0.06)) {
             if (step.face !== undefined && Math.abs(angleTo(st.rot, step.face)) > 0.06) faceAngle = step.face;
             else heroCmd.shift();
+          } else if (st.turnFirst && Math.abs(angleTo(st.rot, Math.atan2(tmp.v.x, tmp.v.z))) > 0.5 && dist > 0.3) {
+            // сначала разворачиваемся по маршруту (в сторону обхода), потом идём
+            faceAngle = Math.atan2(tmp.v.x, tmp.v.z);
           } else {
+            st.turnFirst = false;
             // на промежуточных точках не тормозим, у цели мягко останавливаемся
             const speed = last ? Math.min(MAX_SPEED, dist * 2.2 + 0.25) : MAX_SPEED * 0.85;
             tmp.desired.copy(tmp.v).normalize().multiplyScalar(speed);
@@ -250,6 +257,15 @@ export function Character() {
         control.pose = step.to;
         const done = (["sit", "lie", "desk"] as const).every((k) => Math.abs(st[k] - (step.to === k ? 1 : 0)) < 0.001);
         if (done) heroCmd.shift();
+      } else if (step.k === "pull") {
+        // дёрнуть шнурок торшера: на середине движения свет переключается
+        const before = st.pull;
+        st.pull = Math.min(1, st.pull + dt / 1.6);
+        if (before < 0.55 && st.pull >= 0.55) props.lampOn = !props.lampOn;
+        if (st.pull >= 1) {
+          st.pull = 0;
+          heroCmd.shift();
+        }
       } else if (step.k === "drink") {
         // взять кружку, отпить, поставить обратно
         st.drink = Math.min(1, st.drink + dt / 3.6);
@@ -386,7 +402,12 @@ export function Character() {
     const freeArm = 1 - Math.max(reaching, h, pull, onDesk);
     // в кресле локти лежат на подлокотниках, предплечья вперёд
     const elbow = sitE * freeArm;
-    const freeR = 1 - Math.max(grab, reachMug);
+    // шнурок торшера: рука вверх, хват, рывок вниз
+    const pu = st.pull;
+    const raise = pu > 0 ? Math.sin(clamp01(pu / 0.9) * Math.PI * 0.5) * smoother(clamp01((1 - pu) / 0.25)) : 0;
+    const tug = pu > 0 ? Math.sin(clamp01((pu - 0.4) / 0.3) * Math.PI) : 0;
+    props.cord = tug;
+    const freeR = 1 - Math.max(grab, reachMug, raise);
     // на кровати руки вдоль тела, ладони на животе
     const rest = lieB * freeArm;
     armL.current!.rotation.x = -swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5;
@@ -397,6 +418,9 @@ export function Character() {
     foreR.current!.rotation.x = (-reaching * 0.9 - elbow * 1.35 - rest * 1.2) * freeR - reachMug * 0.3 - sip * 1.85 - (grab - sip) * 0.9;
     foreL.current!.rotation.z = -h * 1.6 + elbow * 0.45 + rest * 0.6;
     foreR.current!.rotation.z = (h * 1.6 - elbow * 0.45 - rest * 0.6) * freeR - sip * 0.35;
+    armR.current!.rotation.x += -raise * 2.6 + tug * 0.5;
+    armR.current!.rotation.z += raise * 0.25;
+    foreR.current!.rotation.x += -raise * 0.25;
     // стул и стол: обе руки вперёд
     for (const [arm, fore] of [[armL, foreL], [armR, foreR]] as const) {
       arm.current!.rotation.x += -pull * 1.1 - onDesk * 0.55;
@@ -677,15 +701,28 @@ export function Character() {
 
       {/* кружка какао со столика */}
       <group ref={mug} position={SPOTS.mugRest.toArray()}>
-        <mesh position={[0, -0.0, 0]} castShadow material={mats.mug}>
-          <cylinderGeometry args={[0.065, 0.06, 0.13, 20]} />
+        {/* кружка открыта сверху: видно какао и пенку */}
+        <mesh castShadow material={mats.mug}>
+          <cylinderGeometry args={[0.065, 0.06, 0.13, 24, 1, true]} />
+        </mesh>
+        <mesh position={[0, -0.063, 0]} rotation-x={Math.PI / 2} material={mats.mug}>
+          <circleGeometry args={[0.06, 20]} />
+        </mesh>
+        <mesh position={[0, 0.065, 0]} rotation-x={Math.PI / 2} material={mats.mug}>
+          <torusGeometry args={[0.062, 0.006, 6, 24]} />
         </mesh>
         <mesh position={[0.07, 0.0, 0]} material={mats.mug}>
           <torusGeometry args={[0.035, 0.012, 8, 16]} />
         </mesh>
-        <mesh position={[0, 0.06, 0]} rotation-x={-Math.PI / 2} material={mats.cocoa}>
-          <circleGeometry args={[0.058, 20]} />
+        <mesh position={[0, 0.045, 0]} rotation-x={-Math.PI / 2} material={mats.cocoa}>
+          <circleGeometry args={[0.062, 24]} />
         </mesh>
+        {/* маршмеллоу */}
+        {[[0.02, 0.015], [-0.022, 0.005], [0.003, -0.025]].map(([x, z], i) => (
+          <mesh key={i} position={[x, 0.05, z]} rotation-y={i} material={mats.mug}>
+            <boxGeometry args={[0.022, 0.016, 0.022]} />
+          </mesh>
+        ))}
       </group>
 
       <group ref={waveAnchor}>

@@ -3,6 +3,7 @@ import { checkAi } from "../atmosphere/analyze";
 import { useStore } from "../store";
 import { PARTICLE_RU } from "./NewMemoryForm";
 import { ActionBar, KeyHint } from "./Controls";
+import { advanceClock, gameClock, partOfDay } from "../scene/dayTime";
 
 const PHASE_TEXT: Record<string, string> = {
   walking: "Готовлюсь слушать…",
@@ -42,6 +43,7 @@ export function Hud() {
         <div className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Атмосферу подбирает Claude на сервере" : "Сервер без ключа: работает локальный анализатор"}>
           {ai === null ? "…" : ai ? "AI: Claude" : "AI: локальный анализ"}
         </div>
+        <TimeChip />
       </header>
 
       {phase === "idle" && panel === "none" && (
@@ -86,5 +88,20 @@ export function Hud() {
       {panel === "none" && <KeyHint />}
       {hint && <div className="toast">{hint}</div>}
     </>
+  );
+}
+
+/** Время в комнате (как на настенных часах); клик — на час вперёд. */
+function TimeChip() {
+  const [h, setH] = useState(gameClock.hours);
+  useEffect(() => {
+    const t = window.setInterval(() => setH(gameClock.hours), 250);
+    return () => window.clearInterval(t);
+  }, []);
+  const hh = Math.floor(h), mm = Math.floor((h * 60) % 60);
+  return (
+    <button className="ai-badge time-chip" title="Время в комнате. Нажмите, чтобы перевести часы на час вперёд" onClick={() => advanceClock(1)}>
+      🕰 {String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")} · {partOfDay(h)}
+    </button>
   );
 }

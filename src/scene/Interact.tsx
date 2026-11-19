@@ -1,13 +1,13 @@
 // Невидимые зоны для клика/тапа: пол (идти), кресло (сесть),
-// кровать (лечь), столик с наушниками (взять/надеть). Плюс лёгкое
-// приближение камеры во время музыки (сама камера за персонажем не ездит).
+// кровать (лечь), столик с наушниками (взять/надеть), торшер.
+// Плюс камера, которая следует за персонажем.
 
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { hero } from "./Character";
 import { control, heroCmd } from "./heroControl";
-import { CHAIR, DESK, ROOM, ROOM_X, ROOM_Z, SIDE_TABLE } from "./Room";
+import { CHAIR, DESK, FLOOR_LAMP, ROOM, ROOM_X, ROOM_Z, SIDE_TABLE } from "./Room";
 
 const ghost = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
 
@@ -90,6 +90,10 @@ export function Interact() {
       <mesh position={[SIDE_TABLE.x + 0.15, 0.68, SIDE_TABLE.z + 0.14]} material={ghost} onClick={tap(() => heroCmd.drink())} {...hover}>
         <boxGeometry args={[0.2, 0.2, 0.2]} />
       </mesh>
+      {/* торшер: дёрнуть шнурок */}
+      <mesh position={[FLOOR_LAMP.x, 1.0, FLOOR_LAMP.z]} material={ghost} onClick={tap(() => heroCmd.toggleLamp())} {...hover}>
+        <cylinderGeometry args={[0.3, 0.3, 2.0, 12]} />
+      </mesh>
       {/* стол и стул: сесть за стол (альбом на столешнице кликается отдельно) */}
       <mesh position={[DESK.x - 0.1, 0.5, DESK.z + 0.75]} material={ghost} onClick={tap(() => heroCmd.desk())} {...hover}>
         <boxGeometry args={[0.6, 1.0, 0.6]} />
@@ -101,18 +105,26 @@ export function Interact() {
   );
 }
 
-/** Камера чуть приближается, когда играет музыка, и возвращается обратно. */
-export function CameraZoom() {
+/**
+ * Камера следует за персонажем: точка, вокруг которой она вращается,
+ * мягко едет за ним. Во время музыки камера чуть приближается.
+ */
+export function CameraFollow() {
   const { camera, controls } = useThree() as unknown as { camera: THREE.Camera; controls: { target: THREE.Vector3; update: () => void } | null };
-  const off = useMemo(() => new THREE.Vector3(), []);
+  const tmp = useMemo(() => ({ goal: new THREE.Vector3(), delta: new THREE.Vector3(), off: new THREE.Vector3() }), []);
   const zoom = useRef({ listening: false, goal: null as number | null, before: 0 });
 
   useFrame((_, rawDt) => {
     if (!controls) return;
     const dt = Math.min(rawDt, 0.05);
+    tmp.goal.set(hero.pos.x, 0.85 + hero.lie * 0.15, hero.pos.z);
+    tmp.delta.subVectors(tmp.goal, controls.target).multiplyScalar(1 - Math.exp(-3 * dt));
+    controls.target.add(tmp.delta);
+    camera.position.add(tmp.delta);
+
     const z = zoom.current;
-    off.subVectors(camera.position, controls.target);
-    const dist = off.length();
+    tmp.off.subVectors(camera.position, controls.target);
+    const dist = tmp.off.length();
     if (hero.listening !== z.listening) {
       z.listening = hero.listening;
       if (hero.listening) {
@@ -122,10 +134,10 @@ export function CameraZoom() {
     }
     if (z.goal !== null) {
       const nd = dist + (z.goal - dist) * (1 - Math.exp(-1.2 * dt));
-      camera.position.copy(controls.target).addScaledVector(off.normalize(), nd);
+      camera.position.copy(controls.target).addScaledVector(tmp.off.normalize(), nd);
       if (Math.abs(nd - z.goal) < 0.03) z.goal = null;
-      controls.update();
     }
+    controls.update();
   });
   return null;
 }

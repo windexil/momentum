@@ -8,7 +8,10 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { audio } from "../audio/engine";
 import { useStore } from "../store";
-import { DESK, ROOM, WINDOW } from "./Room";
+import { NEUTRAL_ATMOSPHERE } from "../atmosphere/types";
+import { DESK, FLOOR_LAMP, ROOM, WINDOW } from "./Room";
+import { stepClock, timeOfDayAtmosphere } from "./dayTime";
+import { props } from "./sceneState";
 import { live, stepLive } from "./live";
 
 type EffectWithIntensity = { intensity: number };
@@ -84,6 +87,9 @@ export function AtmosphereRig() {
     () => new THREE.MeshStandardMaterial({ color: "#ffe2b0", emissive: "#ffd9a0", emissiveIntensity: 1.2, roughness: 0.6, side: THREE.DoubleSide }),
     [],
   );
+  const floorShade = useMemo(() => lampShade.clone(), [lampShade]);
+  const cord = useRef<THREE.Group>(null);
+  const st = useMemo(() => ({ floorOn: 1 }), []);
   const tmp = useMemo(() => new THREE.Color(), []);
 
   useFrame(({ clock }, rawDt) => {
@@ -91,7 +97,10 @@ export function AtmosphereRig() {
     const t = clock.elapsedTime;
     const { target, preview, phase } = useStore.getState();
     // Во время перелистывания альбома даём «намёк» на атмосферу страницы.
-    const goal = phase === "idle" && preview ? preview : target;
+    // без воспоминания атмосферу задаёт время суток на часах
+    stepClock(dt);
+    const base = target === NEUTRAL_ATMOSPHERE ? timeOfDayAtmosphere() : target;
+    const goal = phase === "idle" && preview ? preview : base;
     const rate = phase === "listening" ? 0.9 : phase === "unwinding" ? 0.45 : preview ? 1.2 : 0.8;
     stepLive(goal, dt, rate);
 
@@ -117,10 +126,16 @@ export function AtmosphereRig() {
 
     lamp.current!.color.copy(live.lampColor);
     lamp.current!.intensity = (1.2 + live.night * 4) * pulse * (1 + Math.sin(t * 7) * 0.01);
+    // торшер плавно гаснет и зажигается шнурком
+    st.floorOn += ((props.lampOn ? 1 : 0) - st.floorOn) * (1 - Math.exp(-6 * dt));
     floorLamp.current!.color.copy(live.lampColor);
-    floorLamp.current!.intensity = (0.6 + live.night * 3.5) * pulse;
+    floorLamp.current!.intensity = (0.6 + live.night * 3.5) * pulse * st.floorOn;
     lampShade.emissive.copy(live.lampColor);
     lampShade.emissiveIntensity = 0.6 + live.night * 1.4 + live.level * 0.8;
+    floorShade.emissive.copy(live.lampColor);
+    floorShade.emissiveIntensity = (0.6 + live.night * 1.4 + live.level * 0.8) * st.floorOn + 0.03;
+    // шнурок: оттягивается вниз, когда персонаж за него тянет
+    cord.current!.scale.y = 1 + props.cord * 0.35;
 
     // Небо
     sky.uniforms.top.value.copy(live.skyColor).multiplyScalar(0.85);
@@ -197,19 +212,30 @@ export function AtmosphereRig() {
         </mesh>
         <pointLight ref={lamp} position={[0, 0.35, 0]} distance={5} decay={1.6} castShadow={false} />
       </group>
-      <pointLight ref={floorLamp} position={[-3.2, 1.55, 1.0]} distance={5} decay={1.6} />
-      <group position={[-3.2, 1.65, 1.0]}>
-        <mesh material={lampShade}>
+      <pointLight ref={floorLamp} position={[FLOOR_LAMP.x, 1.55, FLOOR_LAMP.z]} distance={5} decay={1.6} />
+      <group position={[FLOOR_LAMP.x, 1.65, FLOOR_LAMP.z]}>
+        {/* шнурок с бусиной: висит с края абажура в сторону комнаты */}
+        <group ref={cord} position={[0.2, -0.13, 0.05]}>
+          <mesh position={[0, -0.16, 0]}>
+            <cylinderGeometry args={[0.004, 0.004, 0.32, 6]} />
+            <meshStandardMaterial color="#e8dcc4" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, -0.33, 0]}>
+            <sphereGeometry args={[0.018, 10, 8]} />
+            <meshStandardMaterial color="#c99a6b" roughness={0.4} />
+          </mesh>
+        </group>
+        <mesh material={floorShade}>
           <cylinderGeometry args={[0.17, 0.27, 0.3, 24, 1, true]} />
         </mesh>
         {/* кант по краям и лампочка внутри */}
-        <mesh position={[0, 0.15, 0]} rotation-x={Math.PI / 2} material={lampShade}>
+        <mesh position={[0, 0.15, 0]} rotation-x={Math.PI / 2} material={floorShade}>
           <torusGeometry args={[0.17, 0.012, 6, 24]} />
         </mesh>
-        <mesh position={[0, -0.15, 0]} rotation-x={Math.PI / 2} material={lampShade}>
+        <mesh position={[0, -0.15, 0]} rotation-x={Math.PI / 2} material={floorShade}>
           <torusGeometry args={[0.27, 0.012, 6, 24]} />
         </mesh>
-        <mesh position={[0, -0.04, 0]} material={lampShade}>
+        <mesh position={[0, -0.04, 0]} material={floorShade}>
           <sphereGeometry args={[0.06, 14, 10]} />
         </mesh>
       </group>

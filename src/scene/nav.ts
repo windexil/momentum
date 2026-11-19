@@ -15,9 +15,9 @@ export const OBSTACLES: Obstacle[] = [
   { id: "desk", kind: "box", x0: DESK.x - 1.05, x1: DESK.x + 1.05, z0: DESK.z - 0.55, z1: DESK.z + 1.05 },
   { id: "chair", kind: "circle", x: CHAIR.x, z: CHAIR.z, r: 0.68 },
   { id: "side", kind: "circle", x: SIDE_TABLE.x, z: SIDE_TABLE.z, r: 0.36 },
-  { id: "plant1", kind: "circle", x: 3.3, z: -1.6, r: 0.38 },
+  { id: "plant1", kind: "circle", x: 0.85, z: -3.15, r: 0.36 },
   { id: "plant2", kind: "circle", x: -3.3, z: 2.9, r: 0.32 },
-  { id: "lamp", kind: "circle", x: -3.2, z: 1.0, r: 0.24 },
+  { id: "lamp", kind: "circle", x: -3.6, z: 0.15, r: 0.24 },
   { id: "shelf", kind: "box", x0: -4, x1: -3.6, z0: 1.0, z1: 2.8 },
   { id: "wardrobe", kind: "box", x0: 3.62, x1: 5, z0: -4, z1: -3.28 },
 ];
@@ -71,13 +71,14 @@ const CELL = 0.12;
 const N = Math.ceil((BOUNDS.max - BOUNDS.min) / CELL) + 1;
 const toCell = (v: number) => Math.max(0, Math.min(N - 1, Math.round((v - BOUNDS.min) / CELL)));
 const toWorld = (i: number) => i * CELL + BOUNDS.min;
-let grid: Uint8Array | null = null;
-let gridR = 0;
+// сетка своя для каждого радиуса (персонаж и питомец)
+const grids = new Map<number, Uint8Array>();
 function getGrid(r: number) {
-  if (grid && gridR === r) return grid;
+  let grid = grids.get(r);
+  if (grid) return grid;
   grid = new Uint8Array(N * N);
-  gridR = r;
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) grid[j * N + i] = blocked(toWorld(i), toWorld(j), r + 0.03) ? 1 : 0;
+  grids.set(r, grid);
   return grid;
 }
 

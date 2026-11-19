@@ -9,6 +9,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { live } from "./live";
 import { props } from "./sceneState";
+import { advanceClock, gameClock } from "./dayTime";
 
 export const ROOM = 4; // от центра до стен (слева и сзади)
 /** Открытые стороны «кукольного домика» чуть дальше: комната шире. */
@@ -18,7 +19,8 @@ export const WARDROBE = { x: 4.3, z: -3.64 };
 export const WALL_H = 3.4;
 export const WINDOW = { x: 0.6, y: 2.0, w: 2.4, h: 1.6 };
 export const CHAIR = { x: -1.3, z: 0.9, rot: Math.PI / 4 };
-export const SIDE_TABLE = { x: -2.35, z: 0.1 };
+export const SIDE_TABLE = { x: -2.15, z: 1.75 }; // слева от кресла
+export const FLOOR_LAMP = { x: -3.6, z: 0.15 }; // между кроватью и полкой, у стены
 export const DESK = { x: 2.3, z: -3.35 };
 
 const std = (color: string, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough });
@@ -88,7 +90,7 @@ export function Room() {
       <Armchair mats={mats} />
       <SideTable mats={mats} />
       <Shelves mats={mats} />
-      <Plant position={[3.3, 0, -1.6]} mats={mats} scale={1.1} />
+      <Plant position={[0.85, 0, -3.15]} mats={mats} scale={1.0} />
       <Plant position={[-3.3, 0, 2.9]} mats={mats} scale={0.85} />
       <FloorLamp mats={mats} />
       <Wardrobe mats={mats} />
@@ -530,17 +532,31 @@ function WallClock({ position, mats }: { position: [number, number, number]; mat
   const second = useRef<THREE.Group>(null);
   useFrame(() => {
     // реальное время
-    const d = new Date();
-    const s = d.getSeconds() + d.getMilliseconds() / 1000;
-    const m = d.getMinutes() + s / 60;
-    const h = (d.getHours() % 12) + m / 60;
+    // время комнаты: от него зависят солнце и небо (dayTime.ts)
+    const total = gameClock.hours;
+    const h = total % 12;
+    const m = (total * 60) % 60;
+    const s = (total * 3600) % 60;
     second.current!.rotation.z = -(s / 60) * Math.PI * 2;
     minute.current!.rotation.z = -(m / 60) * Math.PI * 2;
     hour.current!.rotation.z = -(h / 12) * Math.PI * 2;
   });
   const R = 0.34;
   return (
-    <group position={position}>
+    <group
+      position={position}
+      onClick={(e) => {
+        e.stopPropagation();
+        advanceClock(1);
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "";
+      }}
+    >
       <mesh position={[0, 0, 0.035]} rotation-x={Math.PI / 2} castShadow material={mats.wood}>
         <cylinderGeometry args={[R + 0.04, R + 0.04, 0.07, 40]} />
       </mesh>
@@ -634,7 +650,7 @@ function Plant({ position, mats, scale = 1 }: { position: [number, number, numbe
 
 function FloorLamp({ mats }: { mats: Mats }) {
   return (
-    <group position={[-3.2, 0, 1.0]}>
+    <group position={[FLOOR_LAMP.x, 0, FLOOR_LAMP.z]}>
       <mesh position={[0, 0.02, 0]} material={mats.metal}>
         <cylinderGeometry args={[0.2, 0.22, 0.04, 20]} />
       </mesh>

@@ -11,7 +11,7 @@ import { useStore } from "../store";
 import { hero } from "./Character";
 import { CHAIR } from "./Room";
 import { live } from "./live";
-import { moveWithCollision } from "./nav";
+import { findPath, moveWithCollision, nearestFree } from "./nav";
 
 // Хвост кошки: гладкая трубка знаком вопроса (вверх и завиток к спине).
 const CAT_TAIL_CURVE = new THREE.CatmullRomCurve3([
@@ -44,6 +44,7 @@ const CAT_TAIL_TIP = CAT_TAIL_CURVE.getPointAt(1).toArray() as [number, number, 
 
 const CHAIR_SPOT = new THREE.Vector3(CHAIR.x + 1.05, 0, CHAIR.z - 0.5);
 const BED_FLOOR = new THREE.Vector3(-1.55, 0, -0.95);
+const PET_R = 0.14;
 const BED_SPOT = new THREE.Vector3(-2.45, 0.8, -1.05);
 const angleTo = (from: number, to: number) => ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
 const approach = (v: number, t: number, s: number) => (v < t ? Math.min(t, v + s) : Math.max(t, v - s));
@@ -72,7 +73,11 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   const legs = useRef<THREE.Group[]>([]);
   const [bubble, setBubble] = useState<PetState>("idle");
   const st = useMemo(
-    () => ({ pos: new THREE.Vector3(0.8, 0, -0.9), rot: 0, walk: 0, moving: 0, lie: 0, onBed: 0, mood: "idle" as PetState, blink: 0 }),
+    () => ({
+      pos: new THREE.Vector3(0.8, 0, -0.9), rot: 0, walk: 0, moving: 0, lie: 0, onBed: 0, mood: "idle" as PetState, blink: 0,
+      // маршрут в обход мебели
+      path: [] as THREE.Vector3[], planGoal: new THREE.Vector3(999, 0, 999), planT: 0,
+    }),
     [],
   );
 
@@ -132,10 +137,21 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
       tmp.d.subVectors(goal, st.pos).setY(0);
       const dist = tmp.d.length();
       if (dist > tol && st.onBed === 0) {
+        // пересчитываем маршрут, когда цель заметно сдвинулась (или раз в секунду)
+        st.planT -= dt;
+        if (st.planGoal.distanceTo(goal) > 0.35 || st.planT <= 0 || !st.path.length) {
+          st.planGoal.copy(goal);
+          st.planT = 1;
+          st.path = findPath(st.pos, nearestFree(goal.x, goal.z, PET_R), PET_R);
+        }
+        while (st.path.length > 1 && Math.hypot(st.path[0].x - st.pos.x, st.path[0].z - st.pos.z) < 0.15) st.path.shift();
+        const wp = st.path[0] ?? goal;
+        tmp.d.subVectors(wp, st.pos).setY(0);
+        const wdist = Math.max(0.0001, tmp.d.length());
         const speed = Math.min(2.4, 0.9 + dist * 1.4);
         st.rot += angleTo(st.rot, Math.atan2(tmp.d.x, tmp.d.z)) * (1 - Math.exp(-8 * dt));
-        tmp.d.normalize().multiplyScalar(Math.min(dist, speed * dt));
-        moveWithCollision(st.pos, tmp.d.x, tmp.d.z, 0.14);
+        tmp.d.normalize().multiplyScalar(Math.min(wdist, speed * dt));
+        moveWithCollision(st.pos, tmp.d.x, tmp.d.z, PET_R);
         moving = 1;
       } else {
         const look = new THREE.Vector3().subVectors(hero.pos, st.pos);

@@ -3,7 +3,9 @@
 
 import * as THREE from "three";
 import { create } from "zustand";
-import { CHAIR, DESK, SIDE_TABLE } from "./Room";
+import { CHAIR, DESK, FLOOR_LAMP, SIDE_TABLE } from "./Room";
+import { isEvening } from "./dayTime";
+import { props } from "./sceneState";
 import { nearestFree } from "./nav";
 
 export type Pose = "stand" | "sit" | "lie" | "desk";
@@ -14,6 +16,7 @@ export type Step =
   | { k: "pose"; to: Pose }
   | { k: "hp"; to: HpLoc }
   | { k: "drink" }
+  | { k: "pull" }
   | { k: "do"; fn: () => void };
 
 export const SPOTS = {
@@ -23,7 +26,9 @@ export const SPOTS = {
   bedSide: new THREE.Vector3(-1.55, 0, -1.9),
   /** Точка «ног» персонажа на кровати; голова к подушке. */
   bedLie: new THREE.Vector3(-2.85, 0.78, -1.25),
-  tableFront: new THREE.Vector3(SIDE_TABLE.x + 0.62, 0, SIDE_TABLE.z - 0.42),
+  tableFront: new THREE.Vector3(SIDE_TABLE.x + 0.45, 0, SIDE_TABLE.z + 0.55),
+  /** Перед торшером: отсюда дёргаем шнурок */
+  lampFront: new THREE.Vector3(FLOOR_LAMP.x + 0.5, 0, FLOOR_LAMP.z + 0.05),
   hpRest: new THREE.Vector3(SIDE_TABLE.x - 0.05, 0.67, SIDE_TABLE.z - 0.08),
   /** Кружка какао на столике */
   mugRest: new THREE.Vector3(SIDE_TABLE.x + 0.14, 0.67, SIDE_TABLE.z + 0.12),
@@ -33,6 +38,7 @@ export const SPOTS = {
 
 export const FACE = {
   desk: Math.PI / 2, // лицом к стулу, потом разворот к столу
+  lamp: -Math.PI / 2 + 0.1,
   chair: CHAIR.rot,
   bed: Math.PI / 2, // спиной к кровати: сначала садимся на край
   table: Math.atan2(SIDE_TABLE.x - SPOTS.tableFront.x, SIDE_TABLE.z - SPOTS.tableFront.z),
@@ -83,7 +89,19 @@ export const heroCmd = {
   },
   lie() {
     if (control.pose === "lie") return;
-    setQueue([...standFirst(), { k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" }]);
+    // вечером без наушников сначала гасим торшер — ложимся спать
+    const lightsOut = isEvening() && control.hp !== "head" && props.lampOn;
+    setQueue([
+      ...standFirst(),
+      ...(lightsOut ? ([{ k: "goto", to: SPOTS.lampFront, face: FACE.lamp }, { k: "pull" }] as Step[]) : []),
+      { k: "goto", to: SPOTS.bedSide, face: FACE.bed },
+      { k: "pose", to: "lie" },
+    ]);
+  },
+  /** Подойти к торшеру и дёрнуть шнурок (включить/выключить). */
+  toggleLamp() {
+    const back = control.pose;
+    setQueue([...standFirst(), { k: "goto", to: SPOTS.lampFront, face: FACE.lamp }, { k: "pull" }, ...(back === "lie" ? [] : backTo(back))]);
   },
   desk() {
     if (control.pose === "desk") return;
