@@ -33,6 +33,7 @@ export function Room() {
       leaf: std("#4d8a55"),
       leaf2: std("#6aa86b"),
       pot: std("#d0764f"),
+      soil: std("#4a3426", 0.95),
       // акценты, следуют палитре
       rug: std("#c9b79c"),
       blanket: std("#8fa39a"),
@@ -97,7 +98,7 @@ function useMatsType() {
     floor: THREE.MeshStandardMaterial; floorDark: THREE.MeshStandardMaterial; wall: THREE.MeshStandardMaterial;
     wall2: THREE.MeshStandardMaterial; trim: THREE.MeshStandardMaterial; wood: THREE.MeshStandardMaterial;
     woodLight: THREE.MeshStandardMaterial; white: THREE.MeshStandardMaterial; metal: THREE.MeshStandardMaterial;
-    leaf: THREE.MeshStandardMaterial; leaf2: THREE.MeshStandardMaterial; pot: THREE.MeshStandardMaterial;
+    leaf: THREE.MeshStandardMaterial; leaf2: THREE.MeshStandardMaterial; pot: THREE.MeshStandardMaterial; soil: THREE.MeshStandardMaterial;
     rug: THREE.MeshStandardMaterial; blanket: THREE.MeshStandardMaterial; cushion: THREE.MeshStandardMaterial;
     chair: THREE.MeshStandardMaterial; poster1: THREE.MeshStandardMaterial; poster2: THREE.MeshStandardMaterial;
     books: THREE.MeshStandardMaterial[];
@@ -333,29 +334,47 @@ function Shelves({ mats }: { mats: Mats }) {
 
 function Plant({ position, mats, scale = 1 }: { position: [number, number, number]; mats: Mats; scale?: number }) {
   const ref = useRef<THREE.Group>(null);
+  // Листья растут из земли внутри горшка и тянутся вверх,
+  // поэтому не проходят сквозь стенки и не торчат далеко в стороны.
   const leaves = useMemo(
     () =>
-      Array.from({ length: 9 }, (_, i) => ({
-        rot: (i / 9) * Math.PI * 2,
-        tilt: 0.5 + (i % 3) * 0.25,
-        len: 0.55 + (i % 4) * 0.12,
+      Array.from({ length: 11 }, (_, i) => ({
+        rot: (i / 11) * Math.PI * 2 + (i % 2) * 0.3,
+        tilt: 0.12 + (i % 3) * 0.14,
+        stem: 0.22 + (i % 4) * 0.07,
+        base: 0.04 + (i % 3) * 0.035,
       })),
     [],
   );
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.rotation.z = Math.sin(clock.elapsedTime * 0.8 * live.animSpeed) * 0.03;
+    if (ref.current) ref.current.rotation.z = Math.sin(clock.elapsedTime * 0.8 * live.animSpeed) * 0.025;
   });
   return (
     <group position={position} scale={scale}>
-      <mesh position={[0, 0.25, 0]} castShadow material={mats.pot}>
-        <cylinderGeometry args={[0.28, 0.22, 0.5, 20]} />
+      <mesh position={[0, 0.25, 0]} castShadow receiveShadow material={mats.pot}>
+        <cylinderGeometry args={[0.28, 0.22, 0.5, 24]} />
       </mesh>
-      <group ref={ref} position={[0, 0.48, 0]}>
+      <mesh position={[0, 0.5, 0]} rotation-x={Math.PI / 2} material={mats.pot}>
+        <torusGeometry args={[0.275, 0.03, 8, 28]} />
+      </mesh>
+      {/* земля */}
+      <mesh position={[0, 0.485, 0]} rotation-x={-Math.PI / 2} material={mats.soil}>
+        <circleGeometry args={[0.26, 24]} />
+      </mesh>
+      <group ref={ref} position={[0, 0.49, 0]}>
         {leaves.map((l, i) => (
           <group key={i} rotation={[0, l.rot, 0]}>
-            <mesh position={[0, l.len * 0.4, l.len * 0.25]} rotation-x={l.tilt} scale={[0.14, l.len * 0.9, 0.04]} castShadow material={i % 2 ? mats.leaf : mats.leaf2}>
-              <sphereGeometry args={[1, 10, 8]} />
-            </mesh>
+            <group position={[0, 0, l.base]} rotation-x={l.tilt}>
+              <mesh position={[0, l.stem / 2, 0]} material={mats.leaf}>
+                <cylinderGeometry args={[0.008, 0.012, l.stem, 5]} />
+              </mesh>
+              {/* лист: вытянутый овал, слегка наклонён наружу */}
+              <group position={[0, l.stem, 0]} rotation-x={0.35}>
+                <mesh position={[0, 0.17, 0]} scale={[0.1, 0.18, 0.022]} castShadow material={i % 2 ? mats.leaf : mats.leaf2}>
+                  <sphereGeometry args={[1, 14, 10]} />
+                </mesh>
+              </group>
+            </group>
           </group>
         ))}
       </group>

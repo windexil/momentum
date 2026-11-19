@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { checkAi } from "../atmosphere/analyze";
 import { useStore } from "../store";
 import { PARTICLE_RU } from "./NewMemoryForm";
+import { ActionBar, Joystick, KeyHint } from "./Controls";
 
 const PHASE_TEXT: Record<string, string> = {
-  walking: "Иду к креслу…",
-  sitting: "Надеваю наушники…",
-  unwinding: "Возвращаюсь в обычный день…",
+  walking: "Готовлюсь слушать…",
+  unwinding: "Снимаю наушники…",
 };
 
 export function Hud() {
@@ -32,7 +32,7 @@ export function Hud() {
   }, [hint, setHint]);
 
   const a = active?.atmosphere;
-  const showNow = active && (phase === "listening" || phase === "sitting" || phase === "walking");
+  const showNow = active && (phase === "listening" || phase === "walking");
 
   return (
     <>
@@ -82,6 +82,9 @@ export function Hud() {
         )}
       </nav>
 
+      {panel === "none" && <ActionBar />}
+      {panel === "none" && <Joystick />}
+      {panel === "none" && <KeyHint />}
       {hint && <div className="toast">{hint}</div>}
     </>
   );

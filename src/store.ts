@@ -19,6 +19,8 @@ interface State {
   /** Предпросмотр при перелистывании альбома (лёгкий намёк на атмосферу). */
   preview: Atmosphere | null;
   hint: string | null;
+  /** Счётчик запросов «пережить день»: персонаж готовится к прослушиванию. */
+  request: number;
 
   init: () => Promise<void>;
   setPanel: (p: Panel) => void;
@@ -41,6 +43,7 @@ export const useStore = create<State>((set, get) => ({
   target: NEUTRAL_ATMOSPHERE,
   preview: null,
   hint: null,
+  request: 0,
 
   init: async () => {
     let memories = await loadMemories();
@@ -66,7 +69,7 @@ export const useStore = create<State>((set, get) => ({
     // Звук разблокируем сразу, в обработчике клика.
     audio.unlock();
     audio.stop(0.3);
-    set({ active: m, panel: "none", preview: null, phase: "walking" });
+    set({ active: m, panel: "none", preview: null, phase: "walking", request: get().request + 1 });
   },
 
   setPhase: (phase) => {

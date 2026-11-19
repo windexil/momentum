@@ -1,46 +1,51 @@
 // Персонаж в «пластилиновом» чиби-стиле: большая голова, худи с капюшоном,
 // круглые формы. Одежда, цвета и наушники настраиваются (src/avatar.ts).
-// Анимации процедурные: ожидание, ходьба, посадка, наушники, покачивание в такт.
+// Управление: клавиатура, джойстик, клик по полу и мебели (heroControl.ts).
+// Анимации процедурные и сглаженные: ходьба, посадка, лёжа на кровати,
+// перенос наушников со столика на шею и на голову, покачивание в такт.
 
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { moodOf, useAvatar, type Mood } from "../avatar";
 import { useStore } from "../store";
-import { CHAIR, SIDE_TABLE } from "./Room";
 import { SoundWaves, Waveform } from "./SoundFx";
+import { control, heroCmd, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
+import { moveWithCollision } from "./nav";
 
-export const HOME = new THREE.Vector3(1.4, 0, -1.4);
-const CHAIR_FRONT = new THREE.Vector3(CHAIR.x + Math.sin(CHAIR.rot) * 0.95, 0, CHAIR.z + Math.cos(CHAIR.rot) * 0.95);
-const CHAIR_SEAT = new THREE.Vector3(CHAIR.x + Math.sin(CHAIR.rot) * 0.12, 0, CHAIR.z + Math.cos(CHAIR.rot) * 0.12);
-const HP_REST = new THREE.Vector3(SIDE_TABLE.x, 0.67, SIDE_TABLE.z);
-
-/** Общее состояние персонажа: по нему ориентируется питомец. */
+/** Общее состояние персонажа: по нему ориентируются питомец, камера и эффекты. */
 export const hero = {
-  pos: HOME.clone(),
+  pos: SPOTS.home.clone(),
   rot: Math.PI / 4,
-  sub: "idle" as Sub,
+  pose: "stand" as Pose,
+  /** 0..1 насколько персонаж лежит */
+  lie: 0,
+  sit: 0,
+  moving: false,
   listening: false,
 };
-type Sub = "idle" | "toChair" | "turn" | "sit" | "wear" | "listen" | "unwear" | "stand" | "toHome";
 
 // Пропорции чиби
 const HIP_Y = 0.5;
 const HEAD_Y = 1.3;
 const HEAD_R = 0.3;
 const SIT_LIFT = 0.17; // таз поднимается на подушку кресла
+const RADIUS = 0.22;
+const MAX_SPEED = 1.7;
+const DETOUR = new THREE.Vector3(0.5, 0, 0.6); // свободная середина комнаты
 
-const WALK_SPEED = 1.3;
-const smooth = (t: number) => t * t * (3 - 2 * t);
+const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 const damp = (a: number, b: number, rate: number, dt: number) => a + (b - a) * (1 - Math.exp(-rate * dt));
 const angleTo = (from: number, to: number) => ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+const approach = (v: number, target: number, step: number) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 
 const clay = (color: string, rough = 0.62) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
 
 export function Character() {
   const avatar = useAvatar((s) => s.avatar);
   const root = useRef<THREE.Group>(null);
+  const poseG = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
   const thighL = useRef<THREE.Group>(null);
@@ -53,6 +58,7 @@ export function Character() {
   const foreR = useRef<THREE.Group>(null);
   const headphones = useRef<THREE.Group>(null);
   const headAnchor = useRef<THREE.Object3D>(null);
+  const neckAnchor = useRef<THREE.Object3D>(null);
   const eyes = useRef<THREE.Group>(null);
   const browL = useRef<THREE.Mesh>(null);
   const browR = useRef<THREE.Mesh>(null);
@@ -62,7 +68,27 @@ export function Character() {
   const waveAnchor = useRef<THREE.Group>(null);
 
   const st = useMemo(
-    () => ({ pos: HOME.clone(), rot: Math.PI / 4, walk: 0, moving: 0, sit: 0, hp: 0, hold: 0, sub: "idle" as Sub, blink: 0, nextBlink: 2 }),
+    () => ({
+      pos: SPOTS.home.clone(),
+      rot: Math.PI / 4,
+      vel: new THREE.Vector3(),
+      walk: 0,
+      sit: 0,
+      lie: 0,
+      carry: 0, // 0 — наушники на столике, 1 — у персонажа
+      onHead: 0, // 0 — на шее, 1 — на голове
+      hold: 0,
+      settle: 0, // «устроился поудобнее» после надевания
+      blink: 0,
+      nextBlink: 2,
+      stuck: 0,
+      detour: false,
+      lastDist: Infinity,
+      request: 0,
+      unwinding: false,
+      uiPose: "stand" as Pose,
+      uiHp: "table" as string,
+    }),
     [],
   );
 
@@ -100,124 +126,216 @@ export function Character() {
     mats.hpPad.emissive.set(avatar.padsColor);
   }, [avatar, mats]);
 
-  const tmpV = useMemo(() => new THREE.Vector3(), []);
-  const headWorld = useMemo(() => new THREE.Vector3(), []);
-  const headQuat = useMemo(() => new THREE.Quaternion(), []);
-  const restQuat = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0.4)), []);
+  // Прерывание подготовки ручным вводом — сбрасываем прослушивание
+  useEffect(() => {
+    control.onInterrupt = () => {
+      const s = useStore.getState();
+      if (s.phase === "walking") s.setPhase("idle");
+    };
+  }, []);
 
-  useFrame(({ clock }, rawDt) => {
+  const tmp = useMemo(
+    () => ({
+      v: new THREE.Vector3(),
+      fwd: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      desired: new THREE.Vector3(),
+      headW: new THREE.Vector3(),
+      headQ: new THREE.Quaternion(),
+      neckW: new THREE.Vector3(),
+      neckQ: new THREE.Quaternion(),
+      carryP: new THREE.Vector3(),
+      carryQ: new THREE.Quaternion(),
+      restQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0.4)),
+    }),
+    [],
+  );
+
+  useFrame(({ clock, camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
-    const { phase, setPhase, active } = useStore.getState();
+    const store = useStore.getState();
+    const { phase, setPhase, active } = store;
 
-    if (phase === "walking" && (st.sub === "idle" || st.sub === "toHome")) st.sub = "toChair";
-    if (phase === "unwinding" && (st.sub === "listen" || st.sub === "wear" || st.sub === "sit")) st.sub = "unwear";
-    if (phase === "idle" && !["idle", "toHome", "stand", "unwear"].includes(st.sub)) st.sub = "unwear";
+    // ---- Связь со сценарием прослушивания ----
+    if (store.request !== st.request) {
+      st.request = store.request;
+      st.unwinding = false;
+      heroCmd.prepareListening(() => useStore.getState().setPhase("listening"));
+    }
+    if (phase === "unwinding" && !st.unwinding) {
+      st.unwinding = true;
+      if (control.hp === "head") control.hp = "neck";
+    }
+    if (st.unwinding && st.onHead <= 0.001) {
+      st.unwinding = false;
+      if (useStore.getState().phase === "unwinding") setPhase("idle");
+    }
+    // сняли наушники вручную во время музыки — музыка затихает
+    if (phase === "listening" && control.hp !== "head") store.stopReliving();
 
-    let moveTarget: THREE.Vector3 | null = null;
-    let faceAngle: number | null = null;
-
-    switch (st.sub) {
-      case "toChair":
-        moveTarget = CHAIR_FRONT;
-        break;
-      case "turn":
-        faceAngle = CHAIR.rot;
-        if (Math.abs(angleTo(st.rot, CHAIR.rot)) < 0.05) st.sub = "sit";
-        break;
-      case "sit":
-        faceAngle = CHAIR.rot;
-        st.sit = Math.min(1, st.sit + dt / 0.9);
-        if (st.sit >= 1) {
-          st.sub = "wear";
-          setPhase("sitting");
-        }
-        break;
-      case "wear":
-        faceAngle = CHAIR.rot;
-        st.hp = Math.min(1, st.hp + dt / 1.3);
-        if (st.hp >= 1) {
-          st.sub = "listen";
-          setPhase("listening");
-        }
-        break;
-      case "listen":
-        faceAngle = CHAIR.rot;
-        if (phase === "walking") setPhase("listening"); // другое воспоминание, не вставая
-        break;
-      case "unwear":
-        faceAngle = CHAIR.rot;
-        st.hp = Math.max(0, st.hp - dt / 1.2);
-        if (st.hp <= 0) st.sub = st.sit > 0 ? "stand" : "toHome";
-        break;
-      case "stand":
-        faceAngle = CHAIR.rot;
-        st.sit = Math.max(0, st.sit - dt / 0.8);
-        if (st.sit <= 0) st.sub = "toHome";
-        break;
-      case "toHome":
-        moveTarget = HOME;
-        break;
-      case "idle":
-        faceAngle = Math.PI / 4 + Math.sin(t * 0.3) * 0.25;
-        break;
+    // ---- Ввод ----
+    control.input.copy(control.keys).add(control.stick);
+    if (control.input.lengthSq() > 1) control.input.normalize();
+    const manual = control.input.lengthSq() > 0.004;
+    if (manual) {
+      if (control.queue.length) {
+        const preparing = control.queue.some((s) => s.k === "do");
+        heroCmd.clear();
+        if (preparing) control.onInterrupt?.();
+      }
+      if (control.pose !== "stand") control.pose = "stand";
     }
 
-    let moving = 0;
-    if (moveTarget) {
-      tmpV.copy(moveTarget).sub(st.pos);
-      tmpV.y = 0;
-      const dist = tmpV.length();
-      if (dist > 0.04) {
-        st.rot += angleTo(st.rot, Math.atan2(tmpV.x, tmpV.z)) * (1 - Math.exp(-10 * dt));
-        st.pos.addScaledVector(tmpV.normalize(), Math.min(dist, WALK_SPEED * dt));
-        moving = 1;
-      } else if (st.sub === "toChair") {
-        st.sub = "turn";
-      } else if (st.sub === "toHome") {
-        st.sub = "idle";
-        if (useStore.getState().phase === "unwinding") setPhase("idle");
+    // ---- Очередь действий ----
+    tmp.desired.set(0, 0, 0);
+    let faceAngle: number | null = null;
+    const step = control.queue[0];
+    const free = st.sit < 0.02 && st.lie < 0.02;
+    if (step) {
+      if (step.k === "goto") {
+        if (!free) control.pose = "stand";
+        else {
+          const target = st.detour ? DETOUR : step.to;
+          tmp.v.copy(target).sub(st.pos).setY(0);
+          const dist = tmp.v.length();
+          if (dist < (st.detour ? 0.3 : step.tol ?? 0.06)) {
+            if (st.detour) {
+              st.detour = false;
+              st.stuck = 0;
+              st.lastDist = Infinity;
+            } else if (step.face !== undefined && Math.abs(angleTo(st.rot, step.face)) > 0.06) {
+              faceAngle = step.face;
+            } else {
+              heroCmd.shift();
+              st.stuck = 0;
+              st.lastDist = Infinity;
+            }
+          } else {
+            const speed = Math.min(MAX_SPEED, dist * 2.2 + 0.25);
+            tmp.desired.copy(tmp.v).normalize().multiplyScalar(speed);
+            // застряли о мебель — обходим через середину комнаты
+            if (dist > st.lastDist - 0.0015) st.stuck += dt;
+            else st.stuck = Math.max(0, st.stuck - dt * 0.5);
+            st.lastDist = Math.min(st.lastDist, dist);
+            if (st.stuck > 0.45) {
+              st.stuck = 0;
+              st.lastDist = Infinity;
+              if (!st.detour) st.detour = true;
+              else {
+                st.detour = false;
+                heroCmd.shift(); // не дошли — не беда
+              }
+            }
+          }
+        }
+      } else if (step.k === "pose") {
+        control.pose = step.to;
+        const sitT = step.to === "sit" ? 1 : 0, lieT = step.to === "lie" ? 1 : 0;
+        if (Math.abs(st.sit - sitT) < 0.001 && Math.abs(st.lie - lieT) < 0.001) heroCmd.shift();
+      } else if (step.k === "hp") {
+        control.hp = step.to;
+        const c = step.to === "table" ? 0 : 1, h = step.to === "head" ? 1 : 0;
+        if (Math.abs(st.carry - c) < 0.001 && Math.abs(st.onHead - h) < 0.001) heroCmd.shift();
+      } else {
+        heroCmd.shift();
+        step.fn();
       }
     }
-    if (faceAngle !== null) st.rot += angleTo(st.rot, faceAngle) * (1 - Math.exp(-6 * dt));
-    st.moving = damp(st.moving, moving, 10, dt);
-    st.walk += dt * 10 * st.moving;
 
-    const sitE = smooth(st.sit);
+    // Ручное движение относительно камеры
+    if (manual && free) {
+      camera.getWorldDirection(tmp.fwd).setY(0).normalize();
+      tmp.right.set(-tmp.fwd.z, 0, tmp.fwd.x);
+      tmp.desired
+        .copy(tmp.fwd)
+        .multiplyScalar(control.input.y)
+        .addScaledVector(tmp.right, control.input.x)
+        .multiplyScalar(MAX_SPEED);
+    }
+
+    // ---- Позы ----
+    const sitTarget = control.pose === "sit" ? 1 : 0;
+    const lieTarget = control.pose === "lie" ? 1 : 0;
+    // встать из одной позы прежде, чем принять другую
+    if (sitTarget && st.lie > 0) st.lie = approach(st.lie, 0, dt / 1.1);
+    else if (lieTarget && st.sit > 0) st.sit = approach(st.sit, 0, dt / 0.9);
+    else {
+      st.sit = approach(st.sit, sitTarget, dt / 1.0);
+      st.lie = approach(st.lie, lieTarget, dt / 1.4);
+    }
+
+    // ---- Наушники ----
+    const carryT = control.hp === "table" ? 0 : 1;
+    const headT = control.hp === "head" ? 1 : 0;
+    if (carryT === 0 && st.onHead > 0) st.onHead = approach(st.onHead, 0, dt / 1.3);
+    else if (headT === 1 && st.carry < 1) st.carry = approach(st.carry, 1, dt / 1.1);
+    else {
+      st.carry = approach(st.carry, carryT, dt / 1.1);
+      st.onHead = approach(st.onHead, headT, dt / 1.6);
+    }
+
+    // ---- Перемещение ----
+    st.vel.x = damp(st.vel.x, tmp.desired.x, 9, dt);
+    st.vel.z = damp(st.vel.z, tmp.desired.z, 9, dt);
+    const speed = Math.hypot(st.vel.x, st.vel.z);
+    if (speed > 0.01) moveWithCollision(st.pos, st.vel.x * dt, st.vel.z * dt, RADIUS);
+    if (speed > 0.08) st.rot += angleTo(st.rot, Math.atan2(st.vel.x, st.vel.z)) * (1 - Math.exp(-10 * dt));
+    else if (faceAngle !== null) st.rot += angleTo(st.rot, faceAngle) * (1 - Math.exp(-7 * dt));
+    const moveAmt = Math.min(1, speed / MAX_SPEED);
+    st.walk += dt * (4 + 8 * moveAmt) * Math.min(1, speed * 3);
+
+    // ---- Корень: сидя — к сиденью, лёжа — на кровать ----
+    const sitE = smoother(st.sit);
+    const lieE = smoother(st.lie);
     const r = root.current!;
-    r.position.set(THREE.MathUtils.lerp(st.pos.x, CHAIR_SEAT.x, sitE), 0, THREE.MathUtils.lerp(st.pos.z, CHAIR_SEAT.z, sitE));
-    r.rotation.y = st.rot;
-    hero.pos.copy(r.position);
-    hero.rot = st.rot;
-    hero.sub = st.sub;
-    hero.listening = st.sub === "listen";
+    let px = st.pos.x, pz = st.pos.z, py = 0;
+    px = THREE.MathUtils.lerp(px, SPOTS.chairSeat.x, sitE);
+    pz = THREE.MathUtils.lerp(pz, SPOTS.chairSeat.z, sitE);
+    px = THREE.MathUtils.lerp(px, SPOTS.bedLie.x, lieE);
+    pz = THREE.MathUtils.lerp(pz, SPOTS.bedLie.z, lieE);
+    py = SPOTS.bedLie.y * lieE + Math.sin(st.lie * Math.PI) * 0.28; // «запрыгивает» на кровать
+    r.position.set(px, py, pz);
+    r.rotation.y = st.rot + angleTo(st.rot, 0) * lieE;
+    poseG.current!.rotation.x = (-Math.PI / 2) * lieE;
 
-    // Поза
-    const listening = st.sub === "listen";
-    const swing = Math.sin(st.walk) * 0.6 * st.moving;
+    // ---- Сценарий музыки ----
+    const listening = phase === "listening" && st.onHead > 0.98;
+    hero.pos.set(px, 0, pz);
+    hero.rot = r.rotation.y;
+    hero.pose = control.pose;
+    hero.sit = st.sit;
+    hero.lie = st.lie;
+    hero.moving = speed > 0.15;
+    hero.listening = listening;
+
+    // Поза тела
+    const swing = Math.sin(st.walk) * 0.6 * moveAmt;
     const breathe = Math.sin(t * 1.8) * 0.01;
     const beat = Math.PI * 2 * (0.8 + live.animSpeed * 0.6);
-    const groove = listening ? Math.sin(t * beat) * (0.05 + live.level * 0.14) : 0;
+    // покачивание нарастает плавно, а не включается рывком
+    st.settle = damp(st.settle, listening ? 1 : 0, 1.5, dt);
+    const groove = Math.sin(t * beat) * (0.05 + live.level * 0.14) * st.settle;
 
-    body.current!.position.y = sitE * SIT_LIFT + Math.abs(Math.sin(st.walk)) * 0.05 * st.moving + breathe;
-    body.current!.rotation.z = groove * 0.35;
-    thighL.current!.rotation.x = THREE.MathUtils.lerp(swing, -Math.PI / 2, sitE);
-    thighR.current!.rotation.x = THREE.MathUtils.lerp(-swing, -Math.PI / 2, sitE);
-    // при сидении ноги болтаются в такт
-    const dangle = listening ? Math.sin(t * beat * 0.5) * 0.25 : 0;
-    shinL.current!.rotation.x = THREE.MathUtils.lerp(Math.max(0, -Math.sin(st.walk)) * 0.8 * st.moving, Math.PI / 2 - 0.25 + dangle, sitE);
-    shinR.current!.rotation.x = THREE.MathUtils.lerp(Math.max(0, Math.sin(st.walk)) * 0.8 * st.moving, Math.PI / 2 - 0.25 - dangle, sitE);
+    body.current!.position.y = sitE * SIT_LIFT + Math.abs(Math.sin(st.walk)) * 0.05 * moveAmt + breathe * (1 - lieE);
+    body.current!.rotation.z = groove * 0.35 * (1 - lieE);
+    const dangle = Math.sin(t * beat * 0.5) * 0.25 * st.settle * sitE;
+    thighL.current!.rotation.x = swing * (1 - sitE) - (Math.PI / 2) * sitE;
+    thighR.current!.rotation.x = -swing * (1 - sitE) - (Math.PI / 2) * sitE;
+    shinL.current!.rotation.x = Math.max(0, -Math.sin(st.walk)) * 0.8 * moveAmt * (1 - sitE) + (Math.PI / 2 - 0.25 + dangle) * sitE + groove * 0.6 * lieE;
+    shinR.current!.rotation.x = Math.max(0, Math.sin(st.walk)) * 0.8 * moveAmt * (1 - sitE) + (Math.PI / 2 - 0.25 - dangle) * sitE - groove * 0.6 * lieE;
 
-    // Руки: тянутся к голове, пока надеваются/снимаются наушники; во время
-    // прослушивания придерживают наушники, как на референсе
-    const reaching = st.hp > 0.02 && st.hp < 0.98 ? Math.sin(st.hp * Math.PI) : 0;
-    st.hold = damp(st.hold, listening ? 1 : 0, 6, dt);
-    const h = st.hold;
-    const armRest = THREE.MathUtils.lerp(0, -0.35, sitE);
-    const free = 1 - Math.max(reaching, h);
-    // reaching: руки вперёд-вверх к голове; hold: локти в стороны, ладони у чашек
-    armL.current!.rotation.x = -swing * 0.9 * free + armRest * free - reaching * 2.75 - h * 0.25;
-    armR.current!.rotation.x = swing * 0.9 * free + armRest * free - reaching * 2.75 - h * 0.25;
+    // Руки: тянутся к столику/голове во время переноса наушников,
+    // а во время музыки (если стоим на месте) придерживают наушники
+    const reachCarry = st.carry > 0.01 && st.carry < 0.99 ? Math.sin(st.carry * Math.PI) : 0;
+    const reachHead = st.onHead > 0.01 && st.onHead < 0.99 ? Math.sin(st.onHead * Math.PI) : 0;
+    const reaching = Math.max(reachCarry * 0.7, reachHead);
+    st.hold = damp(st.hold, listening && speed < 0.2 ? 1 : 0, 3, dt);
+    const h = st.hold * (1 - reaching);
+    const armRest = -0.35 * sitE;
+    const freeArm = 1 - Math.max(reaching, h);
+    armL.current!.rotation.x = (-swing * 0.9 + armRest) * freeArm - reaching * 2.75 - h * 0.25;
+    armR.current!.rotation.x = (swing * 0.9 + armRest) * freeArm - reaching * 2.75 - h * 0.25;
     armL.current!.rotation.z = -0.25 - reaching * 0.2 - h * 1.65 + groove * 0.4;
     armR.current!.rotation.z = 0.25 + reaching * 0.2 + h * 1.65 + groove * 0.4;
     foreL.current!.rotation.x = -reaching * 0.9;
@@ -225,12 +343,12 @@ export function Character() {
     foreL.current!.rotation.z = -h * 1.6;
     foreR.current!.rotation.z = h * 1.6;
 
-    head.current!.rotation.x = groove * 1.1 + (listening ? -0.06 : 0);
+    head.current!.rotation.x = groove * 1.1 - 0.06 * st.settle - 0.25 * lieE;
     head.current!.rotation.z = groove * 0.7;
-    head.current!.rotation.y = st.sub === "idle" ? Math.sin(t * 0.5) * 0.15 : 0;
+    head.current!.rotation.y = speed < 0.05 && !listening && control.pose === "stand" ? Math.sin(t * 0.5) * 0.15 : 0;
 
-    // Мимика
-    const mood: Mood = listening ? moodOf(active?.atmosphere) : "happy";
+    // ---- Мимика ----
+    const mood: Mood = listening ? moodOf(active?.atmosphere) : control.pose === "lie" ? "sleepy" : "happy";
     st.nextBlink -= dt;
     if (st.nextBlink <= 0) {
       st.blink = 0.14;
@@ -247,19 +365,33 @@ export function Character() {
     openMouth.current!.visible = mood === "playful";
     openMouth.current!.scale.y = 0.8 + live.level * 0.8;
 
-    // Наушники: со столика на голову
-    headAnchor.current!.getWorldPosition(headWorld);
-    headAnchor.current!.getWorldQuaternion(headQuat);
-    const hpE = smooth(st.hp);
+    // ---- Наушники: столик → шея → голова (по дуге) ----
+    headAnchor.current!.getWorldPosition(tmp.headW);
+    headAnchor.current!.getWorldQuaternion(tmp.headQ);
+    neckAnchor.current!.getWorldPosition(tmp.neckW);
+    neckAnchor.current!.getWorldQuaternion(tmp.neckQ);
+    const onHeadE = smoother(st.onHead);
+    tmp.carryP.lerpVectors(tmp.neckW, tmp.headW, onHeadE);
+    tmp.carryP.y += Math.sin(st.onHead * Math.PI) * 0.18;
+    tmp.carryQ.slerpQuaternions(tmp.neckQ, tmp.headQ, onHeadE);
+    const carryE = smoother(st.carry);
     const hp = headphones.current!;
-    hp.position.lerpVectors(HP_REST, headWorld, hpE);
-    hp.position.y += Math.sin(st.hp * Math.PI) * 0.35;
-    hp.quaternion.slerpQuaternions(restQuat, headQuat, hpE);
-    hp.scale.setScalar(THREE.MathUtils.lerp(0.75, 1, hpE));
-    mats.hpPad.emissiveIntensity = listening ? 0.25 + live.level * 1.2 : 0;
+    hp.position.lerpVectors(SPOTS.hpRest, tmp.carryP, carryE);
+    hp.position.y += Math.sin(st.carry * Math.PI) * 0.3;
+    hp.quaternion.slerpQuaternions(tmp.restQ, tmp.carryQ, carryE);
+    hp.scale.setScalar(THREE.MathUtils.lerp(0.75, THREE.MathUtils.lerp(0.95, 1, onHeadE), carryE));
+    mats.hpPad.emissiveIntensity = st.settle * (0.25 + live.level * 1.2);
 
     // Дорожка над головой
-    waveAnchor.current!.position.set(headWorld.x, headWorld.y + 0.62, headWorld.z);
+    waveAnchor.current!.position.set(tmp.headW.x, tmp.headW.y + 0.62 - lieE * 0.1, tmp.headW.z);
+
+    // ---- Состояние для кнопок интерфейса ----
+    const uiHp = control.hp;
+    if (st.uiPose !== control.pose || st.uiHp !== uiHp) {
+      st.uiPose = control.pose;
+      st.uiHp = uiHp;
+      useHeroUI.setState({ pose: control.pose, hp: uiHp });
+    }
   });
 
   const isHoodie = avatar.top === "hoodie";
@@ -267,8 +399,10 @@ export function Character() {
 
   return (
     <>
-      <group ref={root} position={HOME.toArray()}>
+      <group ref={root} position={SPOTS.home.toArray()}>
+        <group ref={poseG}>
         <group ref={body}>
+          <object3D ref={neckAnchor} position={[0, 0.98, 0.04]} rotation-x={1.25} />
           {/* ноги */}
           {([[thighL, shinL, -0.11], [thighR, shinR, 0.11]] as const).map(([thigh, shin, x], i) => (
             <group key={i} ref={thigh} position={[x, HIP_Y, 0]}>
@@ -434,6 +568,7 @@ export function Character() {
             )}
             <object3D ref={headAnchor} position={[0, HEAD_Y - 0.98 + 0.02, 0]} />
           </group>
+        </group>
         </group>
       </group>
 
