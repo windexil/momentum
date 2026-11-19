@@ -71,11 +71,9 @@ function drawCover(canvas: HTMLCanvasElement, text: string) {
 
 export function Album3D() {
   const cover = useRef<THREE.Group>(null);
-  const glow = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const open = useStore((s) => s.panel === "album");
   const setPanel = useStore((s) => s.setPanel);
-  const phase = useStore((s) => s.phase);
   // за столом альбом листается прямо на столе, а не во всплывающем окне
   const atDesk = useHeroUI((s) => s.pose === "desk");
 
@@ -106,17 +104,14 @@ export function Album3D() {
       ribbon: new THREE.MeshStandardMaterial({ color: "#8e1f24", roughness: 0.5 }),
       pages: new THREE.MeshStandardMaterial({ color: "#e6d3aa", roughness: 0.95 }),
       gold: new THREE.MeshStandardMaterial({ color: "#e0b25b", roughness: 0.3, metalness: 0.7, emissive: "#e0b25b", emissiveIntensity: 0.1 }),
-      glow: new THREE.MeshBasicMaterial({ color: "#ffe2a8", transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
     }),
     [],
   );
 
-  useFrame(({ clock }, dt) => {
+  useFrame((_, dt) => {
     // шарнир справа: обложка поднимается вверх и ложится вправо, не задевая стол
     const target = open ? -Math.PI * 0.96 : 0;
     cover.current!.rotation.z += (target - cover.current!.rotation.z) * (1 - Math.exp(-6 * dt));
-    const pulse = phase === "idle" && !open ? 0.25 + Math.sin(clock.elapsedTime * 2.2) * 0.12 : 0;
-    mats.glow.opacity += ((hovered ? 0.55 : pulse) - mats.glow.opacity) * (1 - Math.exp(-8 * dt));
     mats.cover.color.set("#4e2f1c").lerp(live.palette[3], 0.08);
   });
 
@@ -139,10 +134,6 @@ export function Album3D() {
         setPanel(open ? "none" : "album");
       }}
     >
-      {/* ореол-подсказка */}
-      <mesh ref={glow} position={[0, 0.002, 0]} rotation-x={-Math.PI / 2} material={mats.glow}>
-        <planeGeometry args={[0.95, 0.75]} />
-      </mesh>
       {/* задняя обложка + блок страниц */}
       <mesh position={[0, 0.012, 0]} castShadow material={mats.cover}>
         <boxGeometry args={[0.62, 0.02, 0.46]} />

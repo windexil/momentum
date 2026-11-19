@@ -3,7 +3,8 @@
 // Каждый кадр «живые» параметры подтягиваются к целевым.
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, Vignette } from "@react-three/postprocessing";
+import { Environment, Lightformer } from "@react-three/drei";
+import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, Vignette } from "@react-three/postprocessing";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { audio } from "../audio/engine";
@@ -118,6 +119,8 @@ export function AtmosphereRig() {
     k.target.updateMatrixWorld();
     k.color.copy(live.keyLightColor);
     k.intensity = live.keyIntensity * (1 - live.night * 0.55) * 2.2;
+    // мягкие отражения от «окна» и потолка; ночью почти гаснут
+    scene.environmentIntensity = 0.32 * (1 - live.night * 0.75);
 
     const h = hemi.current!;
     h.color.copy(live.ambientColor);
@@ -244,7 +247,16 @@ export function AtmosphereRig() {
         <planeGeometry args={[WINDOW.w + 0.5, WINDOW.h + 0.4]} />
       </mesh>
       <mesh geometry={beamGeo} material={beamMat} />
-      <EffectComposer multisampling={4}>
+      {/* окружение для отражений на лакированном дереве и металле — без загрузки файлов */}
+      <Environment resolution={128} frames={1}>
+        <Lightformer form="rect" intensity={3} color="#fff4e2" position={[0.6, 3, -6]} scale={[4, 3, 1]} />
+        <Lightformer form="rect" intensity={1.2} color="#ffe9cf" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} />
+        <Lightformer form="rect" intensity={0.6} color="#cfdcff" position={[8, 2, 4]} rotation-y={-Math.PI / 2} scale={[8, 4, 1]} />
+        <Lightformer form="rect" intensity={0.35} color="#b98d63" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
+      </Environment>
+      <EffectComposer multisampling={4} enableNormalPass={false}>
+        {/* затенение в углах и под предметами */}
+        <N8AO halfRes quality="medium" aoRadius={0.45} distanceFalloff={0.6} intensity={2.2} color="#2a1c12" />
         <Bloom ref={bloom as never} intensity={0.4} luminanceThreshold={0.62} luminanceSmoothing={0.3} mipmapBlur />
         <HueSaturation ref={hs as never} saturation={0} />
         <BrightnessContrast ref={bc as never} contrast={0} brightness={0} />

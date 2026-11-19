@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { live } from "./live";
 import { props } from "./sceneState";
 import { advanceClock, gameClock } from "./dayTime";
+import { fabricTextures, plasterTextures, woodTextures } from "./textures";
 
 export const ROOM = 4; // от центра до стен (слева и сзади)
 /** Открытые стороны «кукольного домика» чуть дальше: комната шире. */
@@ -25,16 +26,21 @@ export const DESK = { x: 2.3, z: -3.35 };
 
 const std = (color: string, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough });
 
+type Tex = { map: THREE.Texture; bump: THREE.Texture };
+/** Материал с фактурой: карта цвета + лёгкий рельеф. */
+const textured = (color: string, rough: number, t: Tex, bump: number) =>
+  new THREE.MeshStandardMaterial({ color, roughness: rough, map: t.map, bumpMap: t.bump, bumpScale: bump });
+
 export function Room() {
   const mats = useMemo(
     () => ({
       floor: std("#c89f74", 0.7),
       floorDark: std("#a77f57", 0.7),
-      wall: std("#efe3d2"),
-      wall2: std("#e6d6c1"),
+      wall: textured("#efe3d2", 0.92, plasterTextures(), 1.2),
+      wall2: textured("#e6d6c1", 0.92, plasterTextures(), 1.2),
       trim: std("#fbf6ee"),
-      wood: std("#9b6b43", 0.6),
-      woodLight: std("#c99a6b", 0.6),
+      wood: textured("#9b6b43", 0.55, woodTextures(11), 0.6),
+      woodLight: textured("#c99a6b", 0.55, woodTextures(12), 0.6),
       white: std("#f6f1ea"),
       metal: new THREE.MeshStandardMaterial({ color: "#3a3a40", roughness: 0.35, metalness: 0.6 }),
       leaf: std("#4d8a55"),
@@ -48,10 +54,10 @@ export function Room() {
       gold: new THREE.MeshStandardMaterial({ color: "#e0b25b", roughness: 0.35, metalness: 0.6 }),
       glass: new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12, depthWrite: false }),
       // акценты, следуют палитре
-      rug: std("#c9b79c"),
-      blanket: std("#8fa39a"),
-      cushion: std("#e9dccb"),
-      chair: std("#5d6b73", 0.9),
+      rug: textured("#c9b79c", 0.97, fabricTextures(), 1.5),
+      blanket: textured("#8fa39a", 0.95, fabricTextures(), 1.2),
+      cushion: textured("#e9dccb", 0.95, fabricTextures(), 1.2),
+      chair: textured("#5d6b73", 0.95, fabricTextures(), 1.2),
       poster1: new THREE.MeshStandardMaterial({ color: "#e9dccb", roughness: 0.9 }),
       poster2: new THREE.MeshStandardMaterial({ color: "#8fa39a", roughness: 0.9 }),
       books: [std("#c0504d"), std("#4f81bd"), std("#9bbb59"), std("#f2c14e"), std("#8064a2")],
@@ -125,9 +131,30 @@ function Floor({ mats }: { mats: Mats }) {
   // паркет полосами
   const planks = [];
   const depth = ROOM + ROOM_Z;
+  // у каждой доски своя фаза волокон и стыков, чтобы пол не выглядел «штампом»
+  const plankMats = useMemo(() => {
+    const out: THREE.MeshStandardMaterial[] = [];
+    for (let i = 0; i < (ROOM + ROOM_X) / 0.5; i++) {
+      const t = woodTextures(i % 4, true);
+      const m = new THREE.MeshStandardMaterial({
+        color: (i % 2 ? mats.floor : mats.floorDark).color.clone().offsetHSL(0, 0, ((i * 37) % 7) * 0.006 - 0.018),
+        roughness: 0.48 + ((i * 13) % 5) * 0.03,
+        map: t.map.clone(),
+        bumpMap: t.bump.clone(),
+        bumpScale: 0.8,
+      });
+      for (const tx of [m.map!, m.bumpMap!]) {
+        tx.repeat.set(1, 2.6);
+        tx.offset.set(0, ((i * 0.618) % 1));
+        tx.needsUpdate = true;
+      }
+      out.push(m);
+    }
+    return out;
+  }, [mats]);
   for (let i = 0; i < (ROOM + ROOM_X) / 0.5; i++) {
     planks.push(
-      <mesh key={i} position={[-ROOM + 0.25 + i * 0.5, -0.05, (ROOM_Z - ROOM) / 2]} receiveShadow material={i % 2 ? mats.floor : mats.floorDark}>
+      <mesh key={i} position={[-ROOM + 0.25 + i * 0.5, -0.05, (ROOM_Z - ROOM) / 2]} receiveShadow material={plankMats[i]}>
         <boxGeometry args={[0.49, 0.1, depth]} />
       </mesh>,
     );
