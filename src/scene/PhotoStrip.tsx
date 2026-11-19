@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { STRIP_SLOTS, useRoom } from "../roomStore";
 import { ROOM } from "./Room";
 
-const X0 = 1.95, X1 = 3.45, Y = 2.08, SAG = 0.09;
+const X0 = 1.95, X1 = 3.45, Y = 1.74, SAG = 0.08; // ниже, на уровне взгляда сидящего за столом
 const Z = -ROOM + 0.03;
 const W = 0.2, H = 0.25, PHOTO = 0.17;
 
@@ -98,6 +98,7 @@ function Polaroid({ index, x, url }: { index: number; x: number; url: string | n
         ref={ref}
         onClick={(e) => {
           e.stopPropagation();
+          if (e.delta > 6) return; // это был поворот взгляда, а не клик
           edit(index);
         }}
         onPointerOver={(e) => {

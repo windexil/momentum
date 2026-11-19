@@ -6,11 +6,13 @@ import { CustomizePanel } from "./ui/CustomizePanel";
 import { Hud } from "./ui/Hud";
 import { NewMemoryForm } from "./ui/NewMemoryForm";
 import { StripEditor } from "./ui/StripEditor";
+import { useHeroUI } from "./scene/heroControl";
 
 export default function App() {
   const init = useStore((s) => s.init);
   const loaded = useStore((s) => s.loaded);
   const panel = useStore((s) => s.panel);
+  const atDesk = useHeroUI((s) => s.pose === "desk");
 
   useEffect(() => {
     void init();
@@ -20,7 +22,7 @@ export default function App() {
     <div className="app">
       <Scene />
       {loaded && <Hud />}
-      {loaded && panel === "album" && <AlbumBook />}
+      {loaded && panel === "album" && !atDesk && <AlbumBook />}
       {loaded && panel === "create" && <NewMemoryForm />}
       {loaded && panel === "custom" && <CustomizePanel />}
       {loaded && <StripEditor />}

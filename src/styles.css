@@ -354,3 +354,21 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .cover-clasp::after { content: ""; position: absolute; right: 8px; top: 9px; width: 16px; height: 22px; border-radius: 4px; background: linear-gradient(#f0d48e, #b8893e); }
 .cover-open { position: absolute; bottom: -58px; left: 50%; transform: translateX(-50%); }
+
+/* альбом, лежащий на столе (вид от первого лица) */
+.album.on-desk { animation: none; }
+.album.on-desk .spread { width: 1240px; height: 460px; filter: none; }
+.album.on-desk .spread::after { display: none; }
+.album.on-desk .page-inner { padding: 22px 26px; }
+.album.on-desk .mem-title { font-size: 34px; }
+.album.on-desk .mem-text { font-size: 13px; }
+.album.on-desk .photos .polaroid { max-width: 64%; }
+.album.on-desk .photos.n1 .polaroid { max-width: 52%; }
+.album.on-desk .close { top: -18px; right: -18px; width: 44px; height: 44px; font-size: 28px; }
+.corner-turn {
+  position: absolute; bottom: 8px; width: 64px; height: 64px; border: 0; z-index: 8; font-size: 34px; color: #5a3a22;
+  background: linear-gradient(135deg, transparent 50%, rgba(255,245,220,.85) 50%); cursor: pointer;
+}
+.corner-turn.left { left: 8px; background: linear-gradient(225deg, transparent 50%, rgba(255,245,220,.85) 50%); }
+.corner-turn.right { right: 8px; }
+.corner-turn:disabled { opacity: 0; pointer-events: none; }

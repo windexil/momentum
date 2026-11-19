@@ -3,7 +3,8 @@
 // Плюс камера, которая следует за персонажем.
 
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useStore } from "../store";
 import * as THREE from "three";
 import { hero } from "./Character";
 import { control, heroCmd } from "./heroControl";
@@ -107,15 +108,51 @@ export function Interact() {
 
 // Глаза персонажа, сидящего за столом, и куда он смотрит: стол и лента со снимками
 const FP_EYE = new THREE.Vector3(DESK.x - 0.02, 1.5, DESK.z + 0.5);
-const FP_LOOK = new THREE.Vector3(DESK.x + 0.42, 1.72, DESK.z - 0.55);
+const FP_LOOK = new THREE.Vector3(DESK.x + 0.42, 1.55, DESK.z - 0.55);
+// Альбом открыт на столе: наклоняемся к нему и смотрим сверху
+const ALB_EYE = new THREE.Vector3(DESK.x + 0.09, 1.4, DESK.z + 0.55);
+const ALB_LOOK = new THREE.Vector3(DESK.x + 0.09, 0.86, DESK.z + 0.1);
+// насколько можно повернуть взгляд за столом (радианы)
+const YAW_MAX = 0.55, PITCH_MAX = 0.4;
 
 /**
  * Камера следует за персонажем: точка, вокруг которой она вращается,
  * мягко едет за ним. Во время музыки камера чуть приближается.
  */
 export function CameraFollow() {
-  const { camera, controls } = useThree() as unknown as { camera: THREE.Camera; controls: { target: THREE.Vector3; update: () => void } | null };
-  const tmp = useMemo(() => ({ goal: new THREE.Vector3(), delta: new THREE.Vector3(), off: new THREE.Vector3() }), []);
+  const { camera, controls, gl } = useThree() as unknown as {
+    camera: THREE.Camera;
+    controls: { target: THREE.Vector3; update: () => void } | null;
+    gl: THREE.WebGLRenderer;
+  };
+  const tmp = useMemo(() => ({ goal: new THREE.Vector3(), delta: new THREE.Vector3(), off: new THREE.Vector3(), dir: new THREE.Vector3() }), []);
+  // поворот взгляда за столом: тянем мышью или пальцем
+  const look = useRef({ yaw: 0, pitch: 0, drag: null as null | { x: number; y: number; yaw: number; pitch: number }, album: 0 });
+  useEffect(() => {
+    const el = gl.domElement;
+    const down = (e: PointerEvent) => {
+      if (!hero.firstPerson) return;
+      look.current.drag = { x: e.clientX, y: e.clientY, yaw: look.current.yaw, pitch: look.current.pitch };
+    };
+    const move = (e: PointerEvent) => {
+      const d = look.current.drag;
+      if (!d || !hero.firstPerson || useStore.getState().panel === "album") return;
+      const k = 2.2 / Math.max(400, el.clientWidth);
+      look.current.yaw = THREE.MathUtils.clamp(d.yaw - (e.clientX - d.x) * k, -YAW_MAX, YAW_MAX);
+      look.current.pitch = THREE.MathUtils.clamp(d.pitch + (e.clientY - d.y) * k, -PITCH_MAX, PITCH_MAX);
+    };
+    const up = () => {
+      look.current.drag = null;
+    };
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [gl]);
   const zoom = useRef({ listening: false, goal: null as number | null, before: 0 });
   // вид от первого лица за столом
   const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
@@ -137,9 +174,26 @@ export function CameraFollow() {
     if (f.on) {
       f.k = Math.min(1, Math.max(0, f.k + (wantFp ? dt : -dt) / 1.1));
       const e = f.k * f.k * (3 - 2 * f.k);
-      tmp.goal.lerpVectors(f.pos, FP_EYE, e);
+      const L = look.current;
+      // открытый альбом: камера наклоняется к столу
+      const albumOpen = wantFp && useStore.getState().panel === "album";
+      L.album += ((albumOpen ? 1 : 0) - L.album) * (1 - Math.exp(-3 * dt));
+      if (!wantFp) {
+        L.yaw *= 1 - Math.min(1, dt * 4);
+        L.pitch *= 1 - Math.min(1, dt * 4);
+      }
+      // направление взгляда с учётом поворота
+      tmp.dir.subVectors(FP_LOOK, FP_EYE);
+      const len = tmp.dir.length();
+      tmp.dir.normalize();
+      const yaw0 = Math.atan2(tmp.dir.x, tmp.dir.z) + L.yaw;
+      const pitch0 = Math.asin(tmp.dir.y) - L.pitch;
+      tmp.dir.set(Math.sin(yaw0) * Math.cos(pitch0), Math.sin(pitch0), Math.cos(yaw0) * Math.cos(pitch0)).multiplyScalar(len);
+      const eye = tmp.off.copy(FP_EYE).lerp(ALB_EYE, L.album);
+      tmp.goal.lerpVectors(f.pos, eye, e);
       camera.position.copy(tmp.goal);
-      tmp.delta.lerpVectors(f.tgt, FP_LOOK, e);
+      tmp.dir.add(FP_EYE).lerp(ALB_LOOK, L.album);
+      tmp.delta.lerpVectors(f.tgt, tmp.dir, e);
       controls.target.copy(tmp.delta);
       cam.fov = THREE.MathUtils.lerp(f.fov, 60, e);
       cam.updateProjectionMatrix();

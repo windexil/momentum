@@ -5,6 +5,8 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoom } from "../roomStore";
+import { AlbumBook } from "../ui/AlbumBook";
+import { useHeroUI } from "./heroControl";
 import * as THREE from "three";
 import { useStore } from "../store";
 import { DESK } from "./Room";
@@ -74,6 +76,8 @@ export function Album3D() {
   const open = useStore((s) => s.panel === "album");
   const setPanel = useStore((s) => s.setPanel);
   const phase = useStore((s) => s.phase);
+  // за столом альбом листается прямо на столе, а не во всплывающем окне
+  const atDesk = useHeroUI((s) => s.pose === "desk");
 
   const coverText = useRoom((s) => s.coverText);
   const coverTex = useMemo(() => {
@@ -131,6 +135,7 @@ export function Album3D() {
       }}
       onClick={(e) => {
         e.stopPropagation();
+        if (e.delta > 6) return;
         setPanel(open ? "none" : "album");
       }}
     >
@@ -175,6 +180,13 @@ export function Album3D() {
       <mesh position={[-0.05, 0.03, 0.24]} rotation-x={0.25} material={mats.ribbon}>
         <boxGeometry args={[0.025, 0.004, 0.12]} />
       </mesh>
+      {open && atDesk && (
+        <Html transform position={[0.31, 0.1, 0]} rotation-x={-Math.PI / 2} scale={0.029} zIndexRange={[20, 0]}>
+          <div onPointerDown={(e) => e.stopPropagation()}>
+            <AlbumBook onDesk />
+          </div>
+        </Html>
+      )}
       {hovered && !open && (
         <Html position={[0, 0.35, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
           <div className="tag">Альбом воспоминаний</div>

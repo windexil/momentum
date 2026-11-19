@@ -9,7 +9,7 @@ import { formatDate } from "../util";
 
 const FLIP_MS = 650;
 
-export function AlbumBook() {
+export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   const memories = useStore((s) => s.memories);
   const setPanel = useStore((s) => s.setPanel);
   const setPreview = useStore((s) => s.setPreview);
@@ -18,7 +18,7 @@ export function AlbumBook() {
   const [index, setIndex] = useState(() => Math.max(0, memories.length - 1));
   const [flip, setFlip] = useState<null | "next" | "prev">(null);
   // сначала видна закрытая обложка с надписью, её можно изменить
-  const [opened, setOpened] = useState(false);
+  const [opened, setOpened] = useState(onDesk); // на столе обложку уже открыла 3D-книга
   const timer = useRef<number | null>(null);
 
   const total = memories.length + 1; // последний разворот — «новая запись»
@@ -73,6 +73,34 @@ export function AlbumBook() {
   // Что лежит «под» перелистываемым листом
   const baseLeft = flip === "prev" ? leftOf(index - 1) : leftOf(index);
   const baseRight = flip === "next" ? rightOf(index + 1) : rightOf(index);
+
+  if (onDesk) {
+    return (
+      <div className="album vintage on-desk">
+        <div className="spread">
+          <Page side="left">{baseLeft}</Page>
+          <Page side="right">{baseRight}</Page>
+          {flip === "next" && (
+            <div className="leaf leaf-right flipping-next">
+              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page></div>
+              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page></div>
+            </div>
+          )}
+          {flip === "prev" && (
+            <div className="leaf leaf-left flipping-prev">
+              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page></div>
+              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page></div>
+            </div>
+          )}
+          <div className="spine" />
+          {/* уголки страниц: тап — перелистнуть */}
+          <button className="corner-turn left" disabled={index === 0 || !!flip} onClick={() => go("prev")} aria-label="Назад">‹</button>
+          <button className="corner-turn right" disabled={index >= total - 1 || !!flip} onClick={() => go("next")} aria-label="Вперёд">›</button>
+        </div>
+        <button className="close" aria-label="Закрыть альбом" onClick={() => setPanel("none")}>×</button>
+      </div>
+    );
+  }
 
   if (!opened) {
     return (
