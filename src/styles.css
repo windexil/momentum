@@ -1,0 +1,191 @@
+:root {
+  --paper: #fbf4e6;
+  --paper-2: #f3e8d3;
+  --ink: #3b2f2a;
+  --muted: #8a776a;
+  --accent: #e07a5f;
+  --accent-2: #3d5a80;
+  --glass: rgba(24, 22, 30, 0.55);
+  --glass-line: rgba(255, 255, 255, 0.14);
+  --radius: 16px;
+  font-family: "Nunito", system-ui, sans-serif;
+  color: #fff;
+}
+
+* { box-sizing: border-box; }
+html, body, #root, .app { margin: 0; height: 100%; overflow: hidden; background: #15141b; }
+button { font: inherit; cursor: pointer; }
+button:disabled { opacity: 0.45; cursor: default; }
+
+.app canvas { display: block; }
+
+/* ---------- HUD ---------- */
+.brand {
+  position: fixed; top: 18px; left: 20px; display: flex; align-items: baseline; gap: 10px;
+  pointer-events: none; text-shadow: 0 2px 12px rgba(0,0,0,.45);
+}
+.logo { font-family: "Caveat", cursive; font-size: 38px; font-weight: 700; letter-spacing: .5px; }
+.sub { font-size: 14px; opacity: .8; }
+.ai-badge {
+  pointer-events: auto; margin-left: 6px; font-size: 12px; padding: 3px 10px; border-radius: 99px;
+  background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(8px); text-shadow: none;
+}
+.ai-badge.on { background: rgba(224, 122, 95, .8); }
+
+.onboard, .phase {
+  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+  padding: 10px 18px; border-radius: 99px; background: var(--glass); border: 1px solid var(--glass-line);
+  backdrop-filter: blur(10px); font-size: 15px; pointer-events: none; animation: float 3s ease-in-out infinite;
+}
+.phase { animation: none; top: 70px; }
+@keyframes float { 50% { transform: translate(-50%, 4px); } }
+
+.dock {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;
+  padding: 8px; border-radius: 99px; background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(12px);
+}
+.dock button {
+  border: 0; background: transparent; color: #fff; padding: 10px 18px; border-radius: 99px; font-weight: 600;
+}
+.dock button:hover, .dock button.on { background: rgba(255,255,255,.14); }
+
+.now {
+  position: fixed; right: 22px; top: 22px; width: 320px; padding: 18px; border-radius: var(--radius);
+  background: var(--glass); border: 1px solid var(--glass-line); border-left-width: 4px; backdrop-filter: blur(14px);
+  animation: slideIn .6s ease both;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(30px); } }
+.now-head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.now-title { font-weight: 800; font-size: 18px; }
+.now-song { font-size: 13px; opacity: .8; }
+.now-mood { font-family: "Caveat", cursive; font-size: 26px; margin-top: 10px; line-height: 1.1; }
+.now-desc { font-size: 13.5px; opacity: .88; margin: 6px 0 10px; line-height: 1.4; }
+.now-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.now-tags span { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.12); }
+.now .primary { width: 100%; }
+
+.eq { display: flex; gap: 3px; align-items: flex-end; height: 26px; }
+.eq i { width: 4px; background: var(--accent); border-radius: 2px; animation: eq 0.9s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; } .eq i:nth-child(4) { animation-delay: -.15s; }
+@keyframes eq { 0%,100% { height: 6px; } 50% { height: 24px; } }
+
+.swatches { display: flex; gap: 4px; }
+.swatches span { width: 22px; height: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); }
+.swatches.big span { width: 44px; height: 32px; border-radius: 8px; }
+
+.toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border-radius: 12px;
+  background: rgba(180, 60, 60, .85); font-size: 14px;
+}
+
+.tag {
+  background: var(--paper); color: var(--ink); padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.25); pointer-events: none;
+}
+
+/* ---------- кнопки ---------- */
+.primary {
+  border: 0; background: var(--accent); color: #fff; padding: 11px 18px; border-radius: 12px; font-weight: 800;
+  box-shadow: 0 6px 18px rgba(224,122,95,.35); transition: transform .15s;
+}
+.primary:hover:not(:disabled) { transform: translateY(-1px); }
+.ghost { border: 1px solid rgba(59,47,42,.2); background: transparent; color: inherit; padding: 9px 14px; border-radius: 12px; font-weight: 600; }
+.ghost.small { padding: 6px 10px; font-size: 13px; }
+
+/* ---------- альбом ---------- */
+.album-wrap {
+  position: fixed; inset: 0; display: grid; place-items: center; background: rgba(10, 8, 14, .35);
+  backdrop-filter: blur(2px); animation: fade .35s ease both;
+}
+@keyframes fade { from { opacity: 0; } }
+.album { position: relative; color: var(--ink); animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(40px) scale(.96); } }
+.spread {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(900px, 94vw); height: min(560px, 74vh);
+  perspective: 2200px; filter: drop-shadow(0 30px 40px rgba(0,0,0,.45));
+}
+.page {
+  position: relative; height: 100%; background: linear-gradient(90deg, var(--paper-2), var(--paper) 12%, var(--paper));
+  overflow: hidden;
+}
+.page-left { border-radius: 14px 0 0 14px; background: linear-gradient(270deg, #e9dcc3, var(--paper) 10%, var(--paper)); }
+.page-right { border-radius: 0 14px 14px 0; }
+.page-inner { height: 100%; padding: 32px 34px; display: flex; flex-direction: column; }
+.page-inner.center { align-items: center; justify-content: center; text-align: center; gap: 12px; }
+.spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(0,0,0,.12); transform: translateX(-1px); }
+
+.leaf { position: absolute; top: 0; width: 50%; height: 100%; transform-style: preserve-3d; z-index: 5; }
+.leaf-right { left: 50%; transform-origin: left center; }
+.leaf-left { left: 0; transform-origin: right center; }
+.leaf-face { position: absolute; inset: 0; backface-visibility: hidden; }
+.leaf-face .page { box-shadow: 0 0 30px rgba(0,0,0,.12); }
+.leaf-face.back { transform: rotateY(180deg); }
+.flipping-next { animation: flipNext .65s cubic-bezier(.45,.05,.35,1) forwards; }
+.flipping-prev { animation: flipPrev .65s cubic-bezier(.45,.05,.35,1) forwards; }
+@keyframes flipNext { to { transform: rotateY(-180deg); } }
+@keyframes flipPrev { to { transform: rotateY(180deg); } }
+
+.date { font-family: "Caveat", cursive; font-size: 30px; color: var(--accent-2); margin-bottom: 14px; }
+.photos { flex: 1; display: grid; gap: 14px; align-content: center; justify-items: center; }
+.photos.n2 { grid-template-columns: 1fr 1fr; }
+.photos.n3 { grid-template-columns: 1fr 1fr; }
+.photos.n3 .polaroid:first-child { grid-column: span 2; max-width: 70%; }
+.polaroid { background: #fff; padding: 8px 8px 22px; box-shadow: 0 6px 16px rgba(0,0,0,.18); width: 100%; }
+.polaroid img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.no-photo { color: var(--muted); font-style: italic; }
+
+.mem-title { font-family: "Caveat", cursive; font-size: 40px; margin: 0 0 8px; line-height: 1; }
+.mem-text { font-size: 15.5px; line-height: 1.55; flex: 1; overflow: auto; margin: 0 0 12px; }
+.song { font-weight: 700; color: var(--accent-2); margin-bottom: 12px; }
+.mood { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.mood b { display: block; }
+.mood small { color: var(--muted); }
+.page-actions { display: flex; gap: 10px; align-items: center; }
+.big-plus { font-size: 80px; color: var(--accent); line-height: 1; font-family: "Caveat", cursive; }
+.muted { color: var(--muted); }
+
+.album-nav { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 16px; color: #fff; }
+.album-nav .ghost { color: #fff; border-color: rgba(255,255,255,.35); background: var(--glass); }
+.page-count { font-weight: 700; }
+.close {
+  position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; border: 0;
+  background: var(--accent); color: #fff; font-size: 22px; line-height: 1; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+/* ---------- форма ---------- */
+.modal-wrap { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(10,8,14,.45); animation: fade .3s both; }
+.modal {
+  width: min(620px, 94vw); max-height: 92vh; overflow: auto; background: var(--paper); color: var(--ink);
+  border-radius: 20px; padding: 26px 28px; box-shadow: 0 30px 60px rgba(0,0,0,.4); animation: rise .45s both;
+}
+.modal h2 { font-family: "Caveat", cursive; font-size: 36px; margin: 0 0 14px; }
+.row { display: flex; gap: 12px; }
+.row.end { justify-content: flex-end; margin-top: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; flex: 1; }
+.field.small { flex: 0 0 160px; }
+.field > span { font-weight: 700; font-size: 14px; }
+.field input:not([type=file]), .field textarea {
+  font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddcdb5; background: #fffdf8; color: var(--ink);
+}
+.field textarea { resize: vertical; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.thumb { width: 84px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid #ddcdb5; padding: 0; background: #fff; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb.add { display: grid; place-items: center; font-size: 28px; color: var(--accent); cursor: pointer; border-style: dashed; }
+.tabs { display: flex; gap: 6px; }
+.tabs button { border: 1px solid #ddcdb5; background: transparent; color: var(--ink); padding: 6px 12px; border-radius: 99px; }
+.tabs button.on { background: var(--accent-2); color: #fff; border-color: transparent; }
+.error { color: #b23a3a; font-weight: 700; }
+.result p { margin: 8px 0; }
+.params { padding-left: 18px; line-height: 1.7; margin: 8px 0 0; }
+
+@media (max-width: 700px) {
+  .spread { grid-template-columns: 1fr; height: auto; }
+  .page-left { border-radius: 14px 14px 0 0; }
+  .page-right { border-radius: 0 0 14px 14px; }
+  .leaf, .spine { display: none; }
+  .now { left: 16px; right: 16px; width: auto; top: auto; bottom: 90px; }
+  .sub { display: none; }
+  .row { flex-direction: column; }
+  .field.small { flex: auto; }
+}
