@@ -123,7 +123,7 @@ export function Album3D() {
   return (
     <group
       position={[DESK.x - 0.22, 0.8, DESK.z + 0.08]}
-      rotation-y={-0.15}
+      rotation-y={atDesk ? 0 : -0.15}
       onPointerOver={(e) => {
         e.stopPropagation();
         setHovered(true);
@@ -181,13 +181,13 @@ export function Album3D() {
         <boxGeometry args={[0.025, 0.004, 0.12]} />
       </mesh>
       {open && atDesk && (
-        <Html transform position={[0.31, 0.1, 0]} rotation-x={-Math.PI / 2} scale={0.029} zIndexRange={[20, 0]}>
+        <Html transform position={[0.31, 0.1, 0]} rotation-x={-Math.PI / 2} scale={0.04} zIndexRange={[20, 0]}>
           <div onPointerDown={(e) => e.stopPropagation()}>
             <AlbumBook onDesk />
           </div>
         </Html>
       )}
-      {hovered && !open && (
+      {hovered && !open && !atDesk && (
         <Html position={[0, 0.35, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
           <div className="tag">Альбом воспоминаний</div>
         </Html>

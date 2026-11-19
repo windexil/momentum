@@ -110,10 +110,13 @@ export function Interact() {
 const FP_EYE = new THREE.Vector3(DESK.x - 0.02, 1.5, DESK.z + 0.5);
 const FP_LOOK = new THREE.Vector3(DESK.x + 0.42, 1.55, DESK.z - 0.55);
 // Альбом открыт на столе: наклоняемся к нему и смотрим сверху
-const ALB_EYE = new THREE.Vector3(DESK.x + 0.09, 1.4, DESK.z + 0.55);
-const ALB_LOOK = new THREE.Vector3(DESK.x + 0.09, 0.86, DESK.z + 0.1);
+// камера прямо над раскрытым альбомом (чуть сдвинута к себе, чтобы верх страниц был сверху экрана)
+const ALB_LOOK = new THREE.Vector3(DESK.x + 0.09, 0.9, DESK.z + 0.08);
+const ALB_EYE = new THREE.Vector3(DESK.x + 0.09, 1.76, DESK.z + 0.1);
 // насколько можно повернуть взгляд за столом (радианы)
-const YAW_MAX = 0.55, PITCH_MAX = 0.4;
+const Q_DOWN = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+// влево (к окну и кровати) можно дальше, вправо — до шкафа, чтобы не смотреть «за стену»
+const YAW_LEFT = 1.1, YAW_RIGHT = 0.5, PITCH_MAX = 0.75;
 
 /**
  * Камера следует за персонажем: точка, вокруг которой она вращается,
@@ -138,7 +141,7 @@ export function CameraFollow() {
       const d = look.current.drag;
       if (!d || !hero.firstPerson || useStore.getState().panel === "album") return;
       const k = 2.2 / Math.max(400, el.clientWidth);
-      look.current.yaw = THREE.MathUtils.clamp(d.yaw - (e.clientX - d.x) * k, -YAW_MAX, YAW_MAX);
+      look.current.yaw = THREE.MathUtils.clamp(d.yaw - (e.clientX - d.x) * k, -YAW_RIGHT, YAW_LEFT);
       look.current.pitch = THREE.MathUtils.clamp(d.pitch + (e.clientY - d.y) * k, -PITCH_MAX, PITCH_MAX);
     };
     const up = () => {
@@ -178,7 +181,7 @@ export function CameraFollow() {
       // открытый альбом: камера наклоняется к столу
       const albumOpen = wantFp && useStore.getState().panel === "album";
       L.album += ((albumOpen ? 1 : 0) - L.album) * (1 - Math.exp(-3 * dt));
-      if (!wantFp) {
+      if (!wantFp || albumOpen) {
         L.yaw *= 1 - Math.min(1, dt * 4);
         L.pitch *= 1 - Math.min(1, dt * 4);
       }
@@ -198,6 +201,8 @@ export function CameraFollow() {
       cam.fov = THREE.MathUtils.lerp(f.fov, 60, e);
       cam.updateProjectionMatrix();
       camera.lookAt(controls.target);
+      // над альбомом смотрим строго вниз, верх страниц — вверху экрана
+      if (L.album > 0.001) camera.quaternion.slerp(Q_DOWN, L.album * e);
       hero.firstPerson = e > 0.92;
       if (!wantFp && f.k === 0) {
         f.on = false;
