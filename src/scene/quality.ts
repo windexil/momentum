@@ -16,9 +16,10 @@ export interface QualitySettings {
 }
 
 export const QUALITY: Record<QualityLevel, QualitySettings> = {
-  high: { dpr: 1.5, msaa: 4, ao: true, aoQuality: "medium", shadowSize: 2048, bloom: true },
-  medium: { dpr: 1.15, msaa: 2, ao: true, aoQuality: "performance", shadowSize: 1024, bloom: true },
-  low: { dpr: 0.85, msaa: 0, ao: false, aoQuality: "performance", shadowSize: 1024, bloom: false },
+  high: { dpr: 1.75, msaa: 4, ao: true, aoQuality: "medium", shadowSize: 2048, bloom: true },
+  // почти как высокое: те же эффекты, только чуть меньше кадр и затенение попроще
+  medium: { dpr: 1.4, msaa: 4, ao: true, aoQuality: "low", shadowSize: 2048, bloom: true },
+  low: { dpr: 1, msaa: 2, ao: false, aoQuality: "performance", shadowSize: 1024, bloom: true },
 };
 
 const ORDER: QualityLevel[] = ["high", "medium", "low"];
@@ -36,8 +37,7 @@ function readMode(): QualityMode {
 
 function startLevel(): QualityLevel {
   // телефоны и планшеты сразу начинают со среднего
-  const touch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
-  return touch ? "medium" : "high";
+  return "high";
 }
 
 interface QualityState {
@@ -66,8 +66,8 @@ export const useQuality = create<QualityState>((set, get) => ({
     }
   },
   decline() {
-    const i = ORDER.indexOf(get().autoLevel);
-    if (i < ORDER.length - 1) set({ autoLevel: ORDER[i + 1] });
+    // авто опускается не ниже среднего; низкое — только вручную
+    if (get().autoLevel === "high") set({ autoLevel: "medium" });
   },
   incline() {
     const i = ORDER.indexOf(get().autoLevel);

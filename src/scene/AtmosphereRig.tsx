@@ -118,7 +118,7 @@ export function AtmosphereRig() {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
     shadowTick.current++;
-    if (q.level === "high" || shadowTick.current % 2 === 0) gl.shadowMap.needsUpdate = true;
+    if (q.level !== "low" || shadowTick.current % 2 === 0) gl.shadowMap.needsUpdate = true;
     const { target, preview, phase } = useStore.getState();
     // Во время перелистывания альбома даём «намёк» на атмосферу страницы.
     // без воспоминания атмосферу задаёт время суток на часах

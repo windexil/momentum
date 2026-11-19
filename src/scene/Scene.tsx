@@ -67,11 +67,11 @@ function QualityRig() {
   const q = useQuality.getState;
   return (
     <PerformanceMonitor
-      bounds={() => [40, 58]}
-      flipflops={4}
+      bounds={() => [28, 50]}
+      flipflops={3}
       onDecline={() => q().decline()}
       onIncline={() => q().incline()}
-      onFallback={() => useQuality.setState({ autoLevel: "low" })}
+      onFallback={() => useQuality.setState({ autoLevel: "medium" })}
     />
   );
 }
