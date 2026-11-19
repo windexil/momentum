@@ -25,6 +25,8 @@ export const hero = {
   lie: 0,
   sit: 0,
   desk: 0,
+  /** Камера смотрит его глазами (за столом) */
+  firstPerson: false,
   moving: false,
   listening: false,
 };
@@ -475,6 +477,10 @@ export function Character() {
     tmp.mugE.set(-sip * 0.9, yaw, 0, "YXZ");
     tmp.mugQ.setFromEuler(tmp.mugE);
     m.quaternion.identity().slerp(tmp.mugQ, grab);
+
+    // От первого лица голова и наушники на ней не должны закрывать обзор
+    head.current!.visible = !hero.firstPerson;
+    hp.visible = !(hero.firstPerson && st.carry > 0.5);
 
     // Дорожка над головой
     waveAnchor.current!.position.set(tmp.headW.x, tmp.headW.y + 0.62 - lieE * 0.1, tmp.headW.z);

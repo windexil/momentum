@@ -2,6 +2,7 @@
 // Левая страница — дата и фото, правая — текст, песня и настроение.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRoom } from "../roomStore";
 import { useStore } from "../store";
 import type { Memory } from "../types";
 import { formatDate } from "../util";
@@ -16,6 +17,8 @@ export function AlbumBook() {
   const removeMemory = useStore((s) => s.removeMemory);
   const [index, setIndex] = useState(() => Math.max(0, memories.length - 1));
   const [flip, setFlip] = useState<null | "next" | "prev">(null);
+  // сначала видна закрытая обложка с надписью, её можно изменить
+  const [opened, setOpened] = useState(false);
   const timer = useRef<number | null>(null);
 
   const total = memories.length + 1; // последний разворот — «новая запись»
@@ -32,7 +35,8 @@ export function AlbumBook() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") go("next");
+      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (e.key === "ArrowRight") opened ? go("next") : setOpened(true);
       if (e.key === "ArrowLeft") go("prev");
       if (e.key === "Escape") setPanel("none");
     };
@@ -70,9 +74,20 @@ export function AlbumBook() {
   const baseLeft = flip === "prev" ? leftOf(index - 1) : leftOf(index);
   const baseRight = flip === "next" ? rightOf(index + 1) : rightOf(index);
 
+  if (!opened) {
+    return (
+      <div className="album-wrap" onClick={() => setPanel("none")}>
+        <div className="album" onClick={(e) => e.stopPropagation()}>
+          <Cover onOpen={() => setOpened(true)} />
+          <button className="close" aria-label="Закрыть альбом" onClick={() => setPanel("none")}>×</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="album-wrap" onClick={() => setPanel("none")}>
-      <div className="album" onClick={(e) => e.stopPropagation()}>
+      <div className="album vintage" onClick={(e) => e.stopPropagation()}>
         <div className="spread">
           <Page side="left">{baseLeft}</Page>
           <Page side="right">{baseRight}</Page>
@@ -91,7 +106,9 @@ export function AlbumBook() {
           <div className="spine" />
         </div>
         <div className="album-nav">
-          <button className="ghost" disabled={index === 0 || !!flip} onClick={() => go("prev")}>← Назад</button>
+          <button className="ghost" disabled={!!flip} onClick={() => (index === 0 ? setOpened(false) : go("prev"))}>
+            {index === 0 ? "← Обложка" : "← Назад"}
+          </button>
           <span className="page-count">{Math.min(index + 1, total)} / {total}</span>
           <button className="ghost" disabled={index >= total - 1 || !!flip} onClick={() => go("next")}>Вперёд →</button>
         </div>
@@ -105,13 +122,47 @@ function Page({ side, children }: { side: "left" | "right"; children: ReactNode 
   return <div className={`page page-${side}`}>{children}</div>;
 }
 
+/** Закрытый альбом: кожаная обложка, надпись можно написать самому. */
+function Cover({ onOpen }: { onOpen: () => void }) {
+  const text = useRoom((s) => s.coverText);
+  const setText = useRoom((s) => s.setCoverText);
+  return (
+    <div className="cover">
+      <div className="cover-frame">
+        <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
+        <input
+          className="cover-title"
+          value={text}
+          maxLength={40}
+          placeholder="Напишите что-нибудь"
+          aria-label="Надпись на обложке"
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="cover-ornament" />
+        <div className="cover-sub">фотоальбом · воспоминания</div>
+        <div className="cover-hint">✎ нажмите на надпись, чтобы изменить её. Она сохранится</div>
+      </div>
+      <div className="cover-clasp" />
+      <button className="primary cover-open" onClick={onOpen}>Открыть альбом →</button>
+    </div>
+  );
+}
+
+const STAMPS = ["AIR MAIL", "PAR AVION", "1965", "POSTE"];
+
 function LeftPage({ m }: { m: Memory }) {
+  const n = m.id.length;
   return (
     <div className="page-inner">
+      <div className="postmark" aria-hidden>
+        <span>{m.date.slice(0, 4)}</span>
+      </div>
+      <div className="stamp" aria-hidden style={{ transform: `rotate(${(n % 5) - 2}deg)` }}>{STAMPS[n % STAMPS.length]}</div>
       <div className="date">{formatDate(m.date)}</div>
       <div className={`photos n${Math.min(m.photos.length, 3)}`}>
         {m.photos.slice(0, 3).map((p, i) => (
           <div className="polaroid" key={i} style={{ transform: `rotate(${(i % 2 ? 1 : -1) * (2 + i * 1.5)}deg)` }}>
+            <span className="tape" aria-hidden />
             <img src={p} alt="" />
           </div>
         ))}
@@ -124,6 +175,7 @@ function LeftPage({ m }: { m: Memory }) {
 function RightPage({ m, onRelive, onDelete }: { m: Memory; onRelive: () => void; onDelete: () => void }) {
   return (
     <div className="page-inner">
+      <div className="doodle" aria-hidden>✿</div>
       <h2 className="mem-title">{m.title}</h2>
       <p className="mem-text">{m.text}</p>
       <div className="song">♪ {m.music.name || "без названия"}</div>

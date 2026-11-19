@@ -5,6 +5,7 @@ import { AlbumBook } from "./ui/AlbumBook";
 import { CustomizePanel } from "./ui/CustomizePanel";
 import { Hud } from "./ui/Hud";
 import { NewMemoryForm } from "./ui/NewMemoryForm";
+import { StripEditor } from "./ui/StripEditor";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -22,6 +23,7 @@ export default function App() {
       {loaded && panel === "album" && <AlbumBook />}
       {loaded && panel === "create" && <NewMemoryForm />}
       {loaded && panel === "custom" && <CustomizePanel />}
+      {loaded && <StripEditor />}
     </div>
   );
 }

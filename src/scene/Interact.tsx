@@ -105,6 +105,10 @@ export function Interact() {
   );
 }
 
+// Глаза персонажа, сидящего за столом, и куда он смотрит: стол и лента со снимками
+const FP_EYE = new THREE.Vector3(DESK.x - 0.02, 1.5, DESK.z + 0.5);
+const FP_LOOK = new THREE.Vector3(DESK.x + 0.42, 1.72, DESK.z - 0.55);
+
 /**
  * Камера следует за персонажем: точка, вокруг которой она вращается,
  * мягко едет за ним. Во время музыки камера чуть приближается.
@@ -113,10 +117,42 @@ export function CameraFollow() {
   const { camera, controls } = useThree() as unknown as { camera: THREE.Camera; controls: { target: THREE.Vector3; update: () => void } | null };
   const tmp = useMemo(() => ({ goal: new THREE.Vector3(), delta: new THREE.Vector3(), off: new THREE.Vector3() }), []);
   const zoom = useRef({ listening: false, goal: null as number | null, before: 0 });
+  // вид от первого лица за столом
+  const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
 
   useFrame((_, rawDt) => {
     if (!controls) return;
     const dt = Math.min(rawDt, 0.05);
+    const cam = camera as THREE.PerspectiveCamera;
+    const f = fp.current;
+    const wantFp = hero.desk > 0.85;
+    if (wantFp && !f.on) {
+      // запоминаем, откуда смотрели, чтобы потом вернуться
+      f.on = true;
+      f.pos.copy(camera.position);
+      f.tgt.copy(controls.target);
+      f.fov = cam.fov;
+      (controls as unknown as { enabled: boolean }).enabled = false;
+    }
+    if (f.on) {
+      f.k = Math.min(1, Math.max(0, f.k + (wantFp ? dt : -dt) / 1.1));
+      const e = f.k * f.k * (3 - 2 * f.k);
+      tmp.goal.lerpVectors(f.pos, FP_EYE, e);
+      camera.position.copy(tmp.goal);
+      tmp.delta.lerpVectors(f.tgt, FP_LOOK, e);
+      controls.target.copy(tmp.delta);
+      cam.fov = THREE.MathUtils.lerp(f.fov, 60, e);
+      cam.updateProjectionMatrix();
+      camera.lookAt(controls.target);
+      hero.firstPerson = e > 0.92;
+      if (!wantFp && f.k === 0) {
+        f.on = false;
+        hero.firstPerson = false;
+        (controls as unknown as { enabled: boolean }).enabled = true;
+        controls.update();
+      }
+      return;
+    }
     tmp.goal.set(hero.pos.x, 0.85 + hero.lie * 0.15, hero.pos.z);
     tmp.delta.subVectors(tmp.goal, controls.target).multiplyScalar(1 - Math.exp(-3 * dt));
     controls.target.add(tmp.delta);

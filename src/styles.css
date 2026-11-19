@@ -257,3 +257,100 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 .time-chip { cursor: pointer; font: inherit; font-size: 12px; color: inherit; }
 .time-chip:hover { background: rgba(224,122,95,.35); }
+
+/* ---------- лента со снимками ---------- */
+.strip-editor { width: min(440px, 94vw); }
+.strip-preview { display: grid; place-items: center; margin: 6px 0 4px; }
+.polaroid.big { width: 240px; transform: rotate(-2deg); }
+.polaroid.big img { aspect-ratio: 1; }
+.strip-empty { aspect-ratio: 1; display: grid; place-items: center; background: #9fb2a8; color: #fff; font-family: "Caveat", cursive; font-size: 30px; }
+.strip-editor .row.end { flex-wrap: wrap; }
+
+/* ---------- винтажный альбом ---------- */
+.album.vintage .page {
+  /* старая крафтовая бумага: пятна, потёртости, затемнение к краям */
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(255,240,210,.35), transparent 55%),
+    radial-gradient(ellipse at 80% 85%, rgba(90,55,25,.18), transparent 60%),
+    radial-gradient(circle at 65% 30%, rgba(120,80,40,.08) 0 40px, transparent 41px),
+    linear-gradient(180deg, #d9bf91, #cfb07d);
+  color: #3a2618;
+}
+.album.vintage .page-left {
+  /* левая страница — «деревянные доски», как на старых альбомах */
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(60,35,15,.35)),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.0) 0 58px, rgba(60,35,15,.28) 58px 60px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 3px, rgba(0,0,0,.03) 3px 7px),
+    linear-gradient(90deg, #a77c50, #b88c5d 40%, #a98052);
+  color: #2e1d10;
+}
+.album.vintage .page-right { box-shadow: inset 18px 0 24px -14px rgba(60,35,15,.45); }
+.album.vintage .page-left { box-shadow: inset -18px 0 24px -14px rgba(30,15,5,.55); }
+.album.vintage .spine { width: 6px; transform: translateX(-3px); background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.05), rgba(0,0,0,.35)); }
+.album.vintage .spread::before {
+  /* кожаный переплёт вокруг страниц */
+  content: ""; position: absolute; inset: -14px; border-radius: 18px; z-index: -1;
+  background: radial-gradient(ellipse at 40% 30%, #6e4126, #3b2214); box-shadow: inset 0 0 0 2px rgba(216,178,106,.35);
+}
+.album.vintage .spread::after {
+  /* лента-закладка */
+  content: ""; position: absolute; left: calc(50% + 14px); bottom: -46px; width: 14px; height: 70px; z-index: 6;
+  background: linear-gradient(90deg, #7a1a1f, #a32a30, #7a1a1f); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+.album.vintage .date { font-family: "Special Elite", "Courier New", monospace; font-size: 20px; color: #f3e3c3; text-shadow: 0 1px 0 rgba(0,0,0,.4); }
+.album.vintage .mem-title { font-family: "Caveat", cursive; color: #4a2a17; }
+.album.vintage .mem-text { font-family: "Special Elite", "Courier New", monospace; font-size: 14px; line-height: 1.6; }
+.album.vintage .song { color: #8e1f24; }
+.album.vintage .mood small, .album.vintage .muted { color: #6b5440; }
+.album.vintage .polaroid { position: relative; background: #f6efe0; box-shadow: 0 8px 18px rgba(20,10,0,.35); }
+.album.vintage .polaroid img { filter: sepia(.25) saturate(.9) contrast(1.02); }
+.tape {
+  position: absolute; top: -10px; left: 50%; width: 70px; height: 20px; transform: translateX(-50%) rotate(-4deg);
+  background: rgba(245,232,200,.75); box-shadow: 0 1px 2px rgba(0,0,0,.15);
+  clip-path: polygon(3% 0, 97% 4%, 100% 100%, 0 96%);
+}
+.stamp {
+  position: absolute; top: 18px; right: 22px; padding: 8px 10px; font: 700 11px "Special Elite", monospace; letter-spacing: 1px;
+  color: #8e1f24; background: #f3e6c8; border: 3px dotted #f3e6c8; outline: 2px solid #8e1f24; outline-offset: -6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,.25); z-index: 2;
+}
+.postmark {
+  position: absolute; top: 12px; right: 82px; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(40,25,60,.45);
+  display: grid; place-items: center; font: 700 11px "Special Elite", monospace; color: rgba(40,25,60,.55); transform: rotate(-14deg);
+  background: repeating-linear-gradient(0deg, transparent 0 9px, rgba(40,25,60,.25) 9px 10px); z-index: 1;
+}
+.doodle { position: absolute; top: 14px; right: 22px; font-size: 26px; color: rgba(142,31,36,.55); transform: rotate(12deg); }
+.album.vintage .page-inner { position: relative; }
+
+/* обложка */
+.cover {
+  position: relative; width: min(520px, 90vw); aspect-ratio: 4 / 3.1; border-radius: 10px 18px 18px 10px;
+  background:
+    radial-gradient(ellipse at 35% 30%, rgba(255,210,160,.18), transparent 60%),
+    radial-gradient(ellipse at 50% 50%, #6e4126, #3b2214 80%);
+  box-shadow: 0 30px 50px rgba(0,0,0,.5), inset 14px 0 18px -10px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.4);
+  display: grid; place-items: center; animation: rise .5s both;
+}
+.cover-frame {
+  position: absolute; inset: 26px; border: 3px solid #d8b26a; outline: 1px solid rgba(216,178,106,.6); outline-offset: -10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center;
+}
+.corner { position: absolute; width: 18px; height: 18px; background: #d8b26a; transform: rotate(45deg); }
+.corner.tl { top: -10px; left: -10px; } .corner.tr { top: -10px; right: -10px; }
+.corner.bl { bottom: -10px; left: -10px; } .corner.br { bottom: -10px; right: -10px; }
+.cover-title {
+  width: 86%; background: transparent; border: 0; border-bottom: 1px dashed transparent; text-align: center;
+  font: 700 clamp(36px, 8vw, 62px) "Caveat", cursive; color: #e9c77f; text-shadow: 0 2px 0 rgba(0,0,0,.45); outline: none;
+}
+.cover-title:hover, .cover-title:focus { border-bottom-color: rgba(233,199,127,.6); }
+.cover-title::placeholder { color: rgba(233,199,127,.45); }
+.cover-ornament { width: 46%; height: 12px; border-top: 2px solid #d8b26a; border-radius: 50%; }
+.cover-sub { font: 600 12px "Nunito", sans-serif; letter-spacing: 3px; text-transform: uppercase; color: rgba(233,199,127,.75); }
+.cover-hint { position: absolute; bottom: 14px; font-size: 12px; color: rgba(233,199,127,.6); }
+.cover-clasp {
+  position: absolute; right: -14px; top: 50%; width: 46px; height: 40px; transform: translateY(-50%); border-radius: 6px;
+  background: linear-gradient(90deg, #4a2b18, #5e3720); box-shadow: 0 4px 8px rgba(0,0,0,.4);
+}
+.cover-clasp::after { content: ""; position: absolute; right: 8px; top: 9px; width: 16px; height: 22px; border-radius: 4px; background: linear-gradient(#f0d48e, #b8893e); }
+.cover-open { position: absolute; bottom: -58px; left: 50%; transform: translateX(-50%); }

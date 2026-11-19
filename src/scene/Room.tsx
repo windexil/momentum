@@ -187,9 +187,9 @@ function Walls({ mats }: { mats: Mats }) {
             <boxGeometry args={[w + 0.4, 0.06, 0.34]} />
           </mesh>
         </group>
-        {/* картина над кроватью и часы над столом */}
+        {/* картина над кроватью, часы над лентой со снимками */}
         <Painting position={[-2.85, 2.15, t / 2]} mats={mats} />
-        <WallClock position={[3.0, 2.35, t / 2]} mats={mats} />
+        <WallClock position={[2.7, 2.78, t / 2]} mats={mats} />
       </group>
       {/* левая стена */}
       <mesh position={[-ROOM - t / 2, WALL_H / 2, (ROOM_Z - ROOM) / 2]} receiveShadow castShadow material={mats.wall2}>

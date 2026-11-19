@@ -7,6 +7,7 @@ import { AtmosphereRig } from "./AtmosphereRig";
 import { Character } from "./Character";
 import { CameraFollow, Interact } from "./Interact";
 import { Particles } from "./Particles";
+import { PhotoStrip } from "./PhotoStrip";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
 
@@ -22,6 +23,7 @@ export function Scene() {
         <AtmosphereRig />
         <Room />
         <Album3D />
+        <PhotoStrip />
         <Character />
         <Pet />
         <Interact />
