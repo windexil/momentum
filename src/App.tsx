@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Scene } from "./scene/Scene";
 import { useStore } from "./store";
 import { AlbumBook } from "./ui/AlbumBook";
+import { CustomizePanel } from "./ui/CustomizePanel";
 import { Hud } from "./ui/Hud";
 import { NewMemoryForm } from "./ui/NewMemoryForm";
 
@@ -20,6 +21,7 @@ export default function App() {
       {loaded && <Hud />}
       {loaded && panel === "album" && <AlbumBook />}
       {loaded && panel === "create" && <NewMemoryForm />}
+      {loaded && panel === "custom" && <CustomizePanel />}
     </div>
   );
 }

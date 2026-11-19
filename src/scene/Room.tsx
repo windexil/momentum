@@ -275,6 +275,18 @@ function SideTable({ mats }: { mats: Mats }) {
       <mesh position={[0, 0.02, 0]} material={mats.wood}>
         <cylinderGeometry args={[0.22, 0.24, 0.04, 24]} />
       </mesh>
+      {/* кружка какао, как на референсе */}
+      <group position={[0.14, 0.61, 0.12]}>
+        <mesh castShadow material={mats.white}>
+          <cylinderGeometry args={[0.065, 0.06, 0.13, 20]} />
+        </mesh>
+        <mesh position={[0.07, 0.07, 0]} material={mats.white}>
+          <torusGeometry args={[0.035, 0.012, 8, 16]} />
+        </mesh>
+        <mesh position={[0, 0.125, 0]} rotation-x={-Math.PI / 2} material={mats.wood}>
+          <circleGeometry args={[0.058, 20]} />
+        </mesh>
+      </group>
     </group>
   );
 }

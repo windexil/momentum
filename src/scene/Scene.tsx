@@ -6,6 +6,7 @@ import { Album3D } from "./Album3D";
 import { AtmosphereRig } from "./AtmosphereRig";
 import { Character } from "./Character";
 import { Particles } from "./Particles";
+import { Pet } from "./Pet";
 import { Room } from "./Room";
 
 export function Scene() {
@@ -21,13 +22,14 @@ export function Scene() {
         <Room />
         <Album3D />
         <Character />
+        <Pet />
         <Particles />
         <ContactShadows position={[0, 0.005, 0]} scale={9} blur={2.4} opacity={0.35} far={2} resolution={512} />
       </Suspense>
       <OrbitControls
         target={[-0.2, 1.0, -0.4]}
         enablePan={false}
-        minDistance={7}
+        minDistance={4.5}
         maxDistance={16}
         minPolarAngle={0.55}
         maxPolarAngle={1.25}

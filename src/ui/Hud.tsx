@@ -76,6 +76,7 @@ export function Hud() {
       <nav className="dock">
         <button className={panel === "album" ? "on" : ""} onClick={() => setPanel(panel === "album" ? "none" : "album")}>📖 Альбом</button>
         <button className={panel === "create" ? "on" : ""} onClick={() => setPanel("create")}>✎ Новая запись</button>
+        <button className={panel === "custom" ? "on" : ""} onClick={() => setPanel(panel === "custom" ? "none" : "custom")}>👕 Персонаж</button>
         {!memories.some((m) => m.demo) && (
           <button onClick={restoreDemos}>Вернуть демо</button>
         )}

@@ -89,6 +89,19 @@ class AudioEngine {
     }
   }
 
+  private wave: Uint8Array<ArrayBuffer> | null = null;
+  /** Форма волны (-1..1) для «звуковой дорожки»; при тишине — нули. */
+  waveform(out: Float32Array) {
+    if (!this.analyser) {
+      out.fill(0);
+      return;
+    }
+    if (!this.wave) this.wave = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+    this.analyser.getByteTimeDomainData(this.wave);
+    const step = this.wave.length / out.length;
+    for (let i = 0; i < out.length; i++) out[i] = (this.wave[Math.floor(i * step)] - 128) / 128;
+  }
+
   /** Сглаженная громкость 0..1 и доля баса — для реакции сцены на музыку. */
   sample(): { level: number; bass: number } {
     if (!this.analyser || !this.buf) return { level: 0, bass: 0 };

@@ -5,7 +5,7 @@ import { buildDemoMemories } from "./data/demo";
 import { deleteMemory, hasSeeded, loadMemories, markSeeded, saveMemory } from "./storage";
 import type { Memory, Phase } from "./types";
 
-type Panel = "none" | "album" | "create";
+type Panel = "none" | "album" | "create" | "custom";
 
 interface State {
   memories: Memory[];
