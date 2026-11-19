@@ -10,7 +10,7 @@ import { useStore } from "../store";
 import { live } from "./live";
 
 const MAX = 600;
-const BOX = { x: 3.8, y: 3.3, z: 3.8 };
+const BOX = { x: 4.3, y: 3.3, z: 4.3, cx: 0.5, cz: 0.5 }; // центр смещён: комната шире к открытым сторонам
 
 function makeTexture(kind: "soft" | "streak" | "petal" | "star") {
   const s = 64;
@@ -77,9 +77,9 @@ export function Particles() {
     const pos = new Float32Array(MAX * 3);
     const seed = new Float32Array(MAX);
     for (let i = 0; i < MAX; i++) {
-      pos[i * 3] = (Math.random() * 2 - 1) * BOX.x;
+      pos[i * 3] = BOX.cx + (Math.random() * 2 - 1) * BOX.x;
       pos[i * 3 + 1] = Math.random() * BOX.y;
-      pos[i * 3 + 2] = (Math.random() * 2 - 1) * BOX.z;
+      pos[i * 3 + 2] = BOX.cz + (Math.random() * 2 - 1) * BOX.z;
       seed[i] = Math.random();
     }
     const geo = new THREE.BufferGeometry();
@@ -169,12 +169,12 @@ export function Particles() {
           z += Math.cos(t * 0.2 + r * 14) * dt * 0.08 * speed;
       }
       // зацикливание в объёме комнаты
-      if (y < 0) { y = BOX.y; x = (Math.random() * 2 - 1) * BOX.x; z = (Math.random() * 2 - 1) * BOX.z; }
-      if (y > BOX.y) { y = 0.05; x = (Math.random() * 2 - 1) * BOX.x; z = (Math.random() * 2 - 1) * BOX.z; }
-      if (x < -BOX.x) x = BOX.x;
-      if (x > BOX.x) x = -BOX.x;
-      if (z < -BOX.z) z = BOX.z;
-      if (z > BOX.z) z = -BOX.z;
+      if (y < 0) { y = BOX.y; x = BOX.cx + (Math.random() * 2 - 1) * BOX.x; z = BOX.cz + (Math.random() * 2 - 1) * BOX.z; }
+      if (y > BOX.y) { y = 0.05; x = BOX.cx + (Math.random() * 2 - 1) * BOX.x; z = BOX.cz + (Math.random() * 2 - 1) * BOX.z; }
+      if (x < BOX.cx - BOX.x) x = BOX.cx + BOX.x;
+      if (x > BOX.cx + BOX.x) x = BOX.cx - BOX.x;
+      if (z < BOX.cz - BOX.z) z = BOX.cz + BOX.z;
+      if (z > BOX.cz + BOX.z) z = BOX.cz - BOX.z;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
     }
     geo.attributes.position.needsUpdate = true;

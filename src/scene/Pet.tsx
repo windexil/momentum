@@ -13,6 +13,35 @@ import { CHAIR } from "./Room";
 import { live } from "./live";
 import { moveWithCollision } from "./nav";
 
+// Хвост кошки: гладкая трубка знаком вопроса (вверх и завиток к спине).
+const CAT_TAIL_CURVE = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(0, 0.05, -0.06),
+  new THREE.Vector3(0, 0.13, -0.09),
+  new THREE.Vector3(0, 0.22, -0.08),
+  new THREE.Vector3(0, 0.28, -0.03),
+  new THREE.Vector3(0, 0.285, 0.025),
+  new THREE.Vector3(0, 0.255, 0.05),
+]);
+const catTail = (() => {
+  const g = new THREE.TubeGeometry(CAT_TAIL_CURVE, 48, 0.026, 12, false);
+  // хвост сужается к кончику
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  const segs = 48, radial = 12;
+  const c = new THREE.Vector3();
+  for (let i = 0; i <= segs; i++) {
+    CAT_TAIL_CURVE.getPointAt(i / segs, c);
+    const k = 1 - (i / segs) * 0.15;
+    for (let j = 0; j <= radial; j++) {
+      const idx = i * (radial + 1) + j;
+      pos.setXYZ(idx, c.x + (pos.getX(idx) - c.x) * k, c.y + (pos.getY(idx) - c.y) * k, c.z + (pos.getZ(idx) - c.z) * k);
+    }
+  }
+  g.computeVertexNormals();
+  return g;
+})();
+const CAT_TAIL_TIP = CAT_TAIL_CURVE.getPointAt(1).toArray() as [number, number, number];
+
 const CHAIR_SPOT = new THREE.Vector3(CHAIR.x + 1.05, 0, CHAIR.z - 0.5);
 const BED_FLOOR = new THREE.Vector3(-1.55, 0, -0.95);
 const BED_SPOT = new THREE.Vector3(-2.45, 0.8, -1.05);
@@ -234,11 +263,12 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
               <sphereGeometry args={[0.055, 14, 12]} />
             </mesh>
           ) : kind === "cat" ? (
-            [0, 1, 2, 3, 4, 5].map((i) => (
-              <mesh key={i} material={i === 5 ? mats.light : mats.fur} position={[0, i * 0.045 + Math.sin(i * 0.7) * 0.015, -0.03 - i * 0.028 + i * i * 0.006]}>
-                <sphereGeometry args={[0.033 - i * 0.001, 10, 8]} />
+            <>
+              <mesh geometry={catTail} material={mats.fur} castShadow />
+              <mesh position={CAT_TAIL_TIP} material={mats.light}>
+                <sphereGeometry args={[0.024, 12, 10]} />
               </mesh>
-            ))
+            </>
           ) : (
             <mesh material={mats.fur} position={[0, 0.05, -0.03]} rotation-x={-0.7}>
               <capsuleGeometry args={[0.03, 0.08, 4, 8]} />

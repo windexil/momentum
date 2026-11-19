@@ -7,7 +7,8 @@ type Box = { kind: "box"; x0: number; x1: number; z0: number; z1: number };
 type Circle = { kind: "circle"; x: number; z: number; r: number };
 export type Obstacle = (Box | Circle) & { id: string };
 
-export const BOUNDS = 3.72;
+// Комната: стены слева (-x) и сзади (-z), открытые стороны дальше.
+export const BOUNDS = { min: -3.72, max: 4.72 };
 
 export const OBSTACLES: Obstacle[] = [
   { id: "bed", kind: "box", x0: -3.85, x1: -1.85, z0: -3.95, z1: -0.72 },
@@ -18,10 +19,11 @@ export const OBSTACLES: Obstacle[] = [
   { id: "plant2", kind: "circle", x: -3.3, z: 2.9, r: 0.32 },
   { id: "lamp", kind: "circle", x: -3.2, z: 1.0, r: 0.24 },
   { id: "shelf", kind: "box", x0: -4, x1: -3.6, z0: 1.0, z1: 2.8 },
+  { id: "wardrobe", kind: "box", x0: 3.62, x1: 5, z0: -4, z1: -3.28 },
 ];
 
 export function blocked(x: number, z: number, r: number, ignore?: string): boolean {
-  if (Math.abs(x) > BOUNDS - r || Math.abs(z) > BOUNDS - r) return true;
+  if (x < BOUNDS.min + r || x > BOUNDS.max - r || z < BOUNDS.min + r || z > BOUNDS.max - r) return true;
   for (const o of OBSTACLES) {
     if (o.id === ignore) continue;
     if (o.kind === "box") {
@@ -66,9 +68,9 @@ export function nearestFree(x: number, z: number, r: number): THREE.Vector3 {
 
 // ---------- Поиск пути (A* по сетке) ----------
 const CELL = 0.12;
-const N = Math.ceil((BOUNDS * 2) / CELL);
-const toCell = (v: number) => Math.max(0, Math.min(N - 1, Math.round((v + BOUNDS) / CELL)));
-const toWorld = (i: number) => i * CELL - BOUNDS;
+const N = Math.ceil((BOUNDS.max - BOUNDS.min) / CELL) + 1;
+const toCell = (v: number) => Math.max(0, Math.min(N - 1, Math.round((v - BOUNDS.min) / CELL)));
+const toWorld = (i: number) => i * CELL + BOUNDS.min;
 let grid: Uint8Array | null = null;
 let gridR = 0;
 function getGrid(r: number) {

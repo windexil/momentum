@@ -1,5 +1,4 @@
-// Визуализация музыки: звуковые волны расходятся от чашек наушников,
-// над головой «звуковая дорожка» (живая форма волны) и всплывающие ноты.
+// Визуализация музыки: над головой «звуковая дорожка» (живая форма волны) и всплывающие ноты.
 
 import { useFrame } from "@react-three/fiber";
 import { Billboard, Line } from "@react-three/drei";
@@ -18,7 +17,7 @@ function updateVisibility(frame: number, dt: number) {
   return visibility;
 }
 
-/** Три кольца, расходящиеся от чашки наушников наружу. */
+/** Три кольца, расходящиеся от чашки наушников наружу (сейчас не используются). */
 export function SoundWaves({ side }: { side: number }) {
   const rings = useRef<THREE.Mesh[]>([]);
   const phases = useRef([0, 0.33, 0.66]);

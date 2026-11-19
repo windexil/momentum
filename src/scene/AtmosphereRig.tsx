@@ -80,7 +80,8 @@ export function AtmosphereRig() {
   );
 
   const lampShade = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#ffe2b0", emissive: "#ffd9a0", emissiveIntensity: 1.2, roughness: 0.6 }),
+    // двусторонний: абажур не «пропадает», когда камера смотрит сверху или сбоку
+    () => new THREE.MeshStandardMaterial({ color: "#ffe2b0", emissive: "#ffd9a0", emissiveIntensity: 1.2, roughness: 0.6, side: THREE.DoubleSide }),
     [],
   );
   const tmp = useMemo(() => new THREE.Color(), []);
@@ -182,7 +183,7 @@ export function AtmosphereRig() {
         shadow-camera-far={30}
       />
       {/* настольная лампа */}
-      <group position={[DESK.x + 0.7, 0.8, DESK.z - 0.2]}>
+      <group position={[DESK.x + 0.88, 0.8, DESK.z - 0.26]}>
         <mesh position={[0, 0.02, 0]}>
           <cylinderGeometry args={[0.1, 0.12, 0.04, 16]} />
           <meshStandardMaterial color="#3a3a40" metalness={0.5} roughness={0.4} />
@@ -197,9 +198,21 @@ export function AtmosphereRig() {
         <pointLight ref={lamp} position={[0, 0.35, 0]} distance={5} decay={1.6} castShadow={false} />
       </group>
       <pointLight ref={floorLamp} position={[-3.2, 1.55, 1.0]} distance={5} decay={1.6} />
-      <mesh position={[-3.2, 1.65, 1.0]} material={lampShade}>
-        <cylinderGeometry args={[0.17, 0.27, 0.3, 20, 1, true]} />
-      </mesh>
+      <group position={[-3.2, 1.65, 1.0]}>
+        <mesh material={lampShade}>
+          <cylinderGeometry args={[0.17, 0.27, 0.3, 24, 1, true]} />
+        </mesh>
+        {/* кант по краям и лампочка внутри */}
+        <mesh position={[0, 0.15, 0]} rotation-x={Math.PI / 2} material={lampShade}>
+          <torusGeometry args={[0.17, 0.012, 6, 24]} />
+        </mesh>
+        <mesh position={[0, -0.15, 0]} rotation-x={Math.PI / 2} material={lampShade}>
+          <torusGeometry args={[0.27, 0.012, 6, 24]} />
+        </mesh>
+        <mesh position={[0, -0.04, 0]} material={lampShade}>
+          <sphereGeometry args={[0.06, 14, 10]} />
+        </mesh>
+      </group>
       {/* небо за окном */}
       <mesh position={[WINDOW.x, WINDOW.y, -ROOM - 0.3]} material={sky}>
         <planeGeometry args={[WINDOW.w + 0.5, WINDOW.h + 0.4]} />

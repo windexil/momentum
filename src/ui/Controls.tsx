@@ -15,7 +15,9 @@ export function ActionBar() {
     <div className="actions">
       {pose !== "sit" && <button onClick={() => heroCmd.sit()}>🪑 Сесть</button>}
       {pose !== "lie" && <button onClick={() => heroCmd.lie()}>🛏 Лечь</button>}
+      {pose !== "desk" && <button onClick={() => heroCmd.desk()}>✍️ За стол</button>}
       {pose !== "stand" && <button onClick={() => heroCmd.stand()}>🚶 Встать</button>}
+      <button onClick={() => heroCmd.drink()}>☕ Попить какао</button>
       {hp === "table" && <button onClick={() => heroCmd.takeHp()}>🎧 Взять наушники</button>}
       {hp === "neck" && <button onClick={() => heroCmd.wearHp()}>🎧 Надеть</button>}
       {hp === "head" && (
@@ -35,7 +37,7 @@ export function KeyHint() {
   if (!show) return null;
   return (
     <div className="keyhint">
-      <b>Клик</b> или <b>тап</b> по полу — идти туда · по креслу, кровати, столику с наушниками — действие
+      <b>Клик</b> или <b>тап</b> по полу — идти туда · по креслу, кровати, столу, наушникам или кружке — действие
     </div>
   );
 }

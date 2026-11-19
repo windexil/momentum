@@ -3,16 +3,17 @@
 
 import * as THREE from "three";
 import { create } from "zustand";
-import { CHAIR, SIDE_TABLE } from "./Room";
+import { CHAIR, DESK, SIDE_TABLE } from "./Room";
 import { nearestFree } from "./nav";
 
-export type Pose = "stand" | "sit" | "lie";
+export type Pose = "stand" | "sit" | "lie" | "desk";
 export type HpLoc = "table" | "neck" | "head";
 
 export type Step =
   | { k: "goto"; to: THREE.Vector3; face?: number; tol?: number }
   | { k: "pose"; to: Pose }
   | { k: "hp"; to: HpLoc }
+  | { k: "drink" }
   | { k: "do"; fn: () => void };
 
 export const SPOTS = {
@@ -24,9 +25,14 @@ export const SPOTS = {
   bedLie: new THREE.Vector3(-2.85, 0.78, -1.25),
   tableFront: new THREE.Vector3(SIDE_TABLE.x + 0.62, 0, SIDE_TABLE.z - 0.42),
   hpRest: new THREE.Vector3(SIDE_TABLE.x - 0.05, 0.67, SIDE_TABLE.z - 0.08),
+  /** Кружка какао на столике */
+  mugRest: new THREE.Vector3(SIDE_TABLE.x + 0.14, 0.67, SIDE_TABLE.z + 0.12),
+  /** Сбоку от стула у письменного стола: отсюда выдвигаем стул и садимся */
+  deskSide: new THREE.Vector3(DESK.x - 0.72, 0, DESK.z + 1.4),
 };
 
 export const FACE = {
+  desk: Math.PI / 2, // лицом к стулу, потом разворот к столу
   chair: CHAIR.rot,
   bed: Math.PI / 2, // спиной к кровати: сначала садимся на край
   table: Math.atan2(SIDE_TABLE.x - SPOTS.tableFront.x, SIDE_TABLE.z - SPOTS.tableFront.z),
@@ -48,6 +54,13 @@ export const control = {
   /** Вызывается, когда новая команда прервала подготовку к прослушиванию */
   onInterrupt: null as null | (() => void),
 };
+
+function backTo(pose: Pose): Step[] {
+  if (pose === "sit") return [{ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" }];
+  if (pose === "lie") return [{ k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" }];
+  if (pose === "desk") return [{ k: "goto", to: SPOTS.deskSide, face: FACE.desk }, { k: "pose", to: "desk" }];
+  return [];
+}
 
 function standFirst(): Step[] {
   return control.pose === "stand" ? [] : [{ k: "pose", to: "stand" }];
@@ -72,6 +85,15 @@ export const heroCmd = {
     if (control.pose === "lie") return;
     setQueue([...standFirst(), { k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" }]);
   },
+  desk() {
+    if (control.pose === "desk") return;
+    setQueue([...standFirst(), ...backTo("desk")]);
+  },
+  /** Подойти к столику и попить какао (потом вернуться, где были). */
+  drink() {
+    const back = control.pose;
+    setQueue([...standFirst(), { k: "goto", to: SPOTS.tableFront, face: FACE.table }, { k: "drink" }, ...backTo(back)]);
+  },
   stand() {
     setQueue(standFirst());
   },
@@ -87,8 +109,7 @@ export const heroCmd = {
       { k: "hp", to: "neck" },
     ];
     // если сидели или лежали — возвращаемся туда же
-    if (back === "sit") steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
-    if (back === "lie") steps.push({ k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" });
+    steps.push(...backTo(back));
     if (thenWear) steps.push({ k: "hp", to: "head" });
     setQueue(steps);
   },
@@ -117,8 +138,7 @@ export const heroCmd = {
     if (control.hp === "table") {
       steps.push(...standFirst(), { k: "goto", to: SPOTS.tableFront, face: FACE.table }, { k: "hp", to: "neck" });
       // классический сценарий из плана: идём в кресло, садимся
-      if (control.pose !== "lie") steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
-      else steps.push({ k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" });
+      steps.push(...backTo(control.pose === "lie" || control.pose === "desk" ? control.pose : "sit"));
     } else if (control.pose === "stand") {
       steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
     }

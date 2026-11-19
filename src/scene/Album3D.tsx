@@ -28,7 +28,8 @@ export function Album3D() {
   );
 
   useFrame(({ clock }, dt) => {
-    const target = open ? -Math.PI * 0.92 : 0;
+    // шарнир справа: обложка поднимается вверх и ложится вправо, не задевая стол
+    const target = open ? -Math.PI * 0.96 : 0;
     cover.current!.rotation.z += (target - cover.current!.rotation.z) * (1 - Math.exp(-6 * dt));
     const pulse = phase === "idle" && !open ? 0.25 + Math.sin(clock.elapsedTime * 2.2) * 0.12 : 0;
     mats.glow.opacity += ((hovered ? 0.55 : pulse) - mats.glow.opacity) * (1 - Math.exp(-8 * dt));
@@ -37,7 +38,7 @@ export function Album3D() {
 
   return (
     <group
-      position={[DESK.x - 0.15, 0.8, DESK.z + 0.05]}
+      position={[DESK.x - 0.22, 0.8, DESK.z + 0.08]}
       rotation-y={-0.15}
       onPointerOver={(e) => {
         e.stopPropagation();
@@ -64,12 +65,15 @@ export function Album3D() {
       <mesh position={[0, 0.05, 0]} castShadow material={mats.pages}>
         <boxGeometry args={[0.58, 0.06, 0.43]} />
       </mesh>
-      {/* обложка на шарнире слева */}
-      <group ref={cover} position={[-0.31, 0.085, 0]}>
-        <mesh position={[0.31, 0, 0]} castShadow material={mats.cover}>
+      {/* корешок и обложка на шарнире справа */}
+      <mesh position={[0.31, 0.048, 0]} castShadow material={mats.cover}>
+        <boxGeometry args={[0.02, 0.095, 0.46]} />
+      </mesh>
+      <group ref={cover} position={[0.31, 0.087, 0]}>
+        <mesh position={[-0.31, 0, 0]} castShadow material={mats.cover}>
           <boxGeometry args={[0.62, 0.02, 0.46]} />
         </mesh>
-        <mesh position={[0.31, 0.012, 0]} material={mats.gold}>
+        <mesh position={[-0.31, 0.012, 0]} material={mats.gold}>
           <boxGeometry args={[0.3, 0.004, 0.2]} />
         </mesh>
       </group>

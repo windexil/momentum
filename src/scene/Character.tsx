@@ -9,9 +9,11 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { moodOf, useAvatar, type Mood } from "../avatar";
 import { useStore } from "../store";
-import { SoundWaves, Waveform } from "./SoundFx";
+import { Waveform } from "./SoundFx";
 import { control, heroCmd, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
+import { DESK } from "./Room";
+import { props } from "./sceneState";
 import { findPath, moveWithCollision } from "./nav";
 
 /** Общее состояние персонажа: по нему ориентируются питомец, камера и эффекты. */
@@ -22,6 +24,7 @@ export const hero = {
   /** 0..1 насколько персонаж лежит */
   lie: 0,
   sit: 0,
+  desk: 0,
   moving: false,
   listening: false,
 };
@@ -37,6 +40,10 @@ const MAX_SPEED = 1.7;
 const BED_EDGE = new THREE.Vector3(-2.08, HIP_Y + 0.27, -1.9); // таз на краю матраса
 const BED_HIP = new THREE.Vector3(-2.72, 0.93, -2.5); // таз лёжа, голова на подушке
 const LIE_TILT = -Math.PI / 2 + 0.12; // чуть приподнятая голова
+// Письменный стол: выдвигаем стул, садимся боком и придвигаемся
+const DESK_LIFT = 0.1;
+const DESK_SEAT1 = new THREE.Vector3(DESK.x - 0.1, 0, DESK.z + 1.2); // на выдвинутом стуле
+const DESK_SEAT2 = new THREE.Vector3(DESK.x - 0.1, 0, DESK.z + 0.92); // придвинулись к столу
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
@@ -70,6 +77,8 @@ export function Character() {
   const frown = useRef<THREE.Mesh>(null);
   const openMouth = useRef<THREE.Mesh>(null);
   const waveAnchor = useRef<THREE.Group>(null);
+  const handR = useRef<THREE.Object3D>(null);
+  const mug = useRef<THREE.Group>(null);
 
   const st = useMemo(
     () => ({
@@ -79,6 +88,8 @@ export function Character() {
       walk: 0,
       sit: 0,
       lie: 0,
+      desk: 0,
+      drink: 0,
       carry: 0, // 0 — наушники на столике, 1 — у персонажа
       onHead: 0, // 0 — на шее, 1 — на голове
       hold: 0,
@@ -115,6 +126,8 @@ export function Character() {
       hp: clay(DEFAULT.hp, 0.35),
       hpPad: new THREE.MeshStandardMaterial({ color: DEFAULT.pad, roughness: 0.55, emissive: DEFAULT.pad, emissiveIntensity: 0 }),
       earInner: clay("#ffb3c7", 0.6),
+      mug: clay("#f6f1ea", 0.4),
+      cocoa: clay("#7a4a2e", 0.3),
     }),
     [],
   );
@@ -153,6 +166,9 @@ export function Character() {
       carryP: new THREE.Vector3(),
       carryQ: new THREE.Quaternion(),
       restQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0.4)),
+      handW: new THREE.Vector3(),
+      mugQ: new THREE.Quaternion(),
+      mugE: new THREE.Euler(),
     }),
     [],
   );
@@ -184,8 +200,14 @@ export function Character() {
     tmp.desired.set(0, 0, 0);
     let faceAngle: number | null = null;
     const step = control.queue[0];
-    const free = st.sit < 0.02 && st.lie < 0.02;
-    if (step) {
+    // начатое чаепитие не бросаем: ставим кружку на место и только потом идём дальше
+    const finishingDrink = st.drink > 0 && step?.k !== "drink";
+    if (finishingDrink) {
+      st.drink = Math.max(st.drink, 0.82) + dt / 0.8;
+      if (st.drink >= 1) st.drink = 0;
+    }
+    const free = st.sit < 0.02 && st.lie < 0.02 && st.desk < 0.02;
+    if (step && !finishingDrink) {
       if (step.k === "goto") {
         if (!free) control.pose = "stand";
         else {
@@ -226,8 +248,15 @@ export function Character() {
         }
       } else if (step.k === "pose") {
         control.pose = step.to;
-        const sitT = step.to === "sit" ? 1 : 0, lieT = step.to === "lie" ? 1 : 0;
-        if (Math.abs(st.sit - sitT) < 0.001 && Math.abs(st.lie - lieT) < 0.001) heroCmd.shift();
+        const done = (["sit", "lie", "desk"] as const).every((k) => Math.abs(st[k] - (step.to === k ? 1 : 0)) < 0.001);
+        if (done) heroCmd.shift();
+      } else if (step.k === "drink") {
+        // взять кружку, отпить, поставить обратно
+        st.drink = Math.min(1, st.drink + dt / 3.6);
+        if (st.drink >= 1) {
+          st.drink = 0;
+          heroCmd.shift();
+        }
       } else if (step.k === "hp") {
         control.hp = step.to;
         const c = step.to === "table" ? 0 : 1, h = step.to === "head" ? 1 : 0;
@@ -239,15 +268,16 @@ export function Character() {
     }
 
     // ---- Позы ----
-    const sitTarget = control.pose === "sit" ? 1 : 0;
-    const lieTarget = control.pose === "lie" ? 1 : 0;
     // встать из одной позы прежде, чем принять другую
-    if (sitTarget && st.lie > 0) st.lie = approach(st.lie, 0, dt / 1.8);
-    else if (lieTarget && st.sit > 0) st.sit = approach(st.sit, 0, dt / 0.9);
-    else {
-      st.sit = approach(st.sit, sitTarget, dt / 1.0);
-      st.lie = approach(st.lie, lieTarget, dt / 2.4);
+    const UP = { sit: 1.0, lie: 2.4, desk: 2.2 }, DOWN = { sit: 0.9, lie: 1.8, desk: 1.6 };
+    let leaving = false;
+    for (const k of ["sit", "lie", "desk"] as const) {
+      if (k !== control.pose && st[k] > 0) {
+        st[k] = approach(st[k], 0, dt / DOWN[k]);
+        leaving = true;
+      }
     }
+    if (!leaving && control.pose !== "stand") st[control.pose] = approach(st[control.pose], 1, dt / UP[control.pose]);
 
     // ---- Наушники ----
     const carryT = control.hp === "table" ? 0 : 1;
@@ -277,9 +307,14 @@ export function Character() {
     const lieB = smoother(clamp01((st.lie - 0.5) / 0.5));
     const lieE = lieB;
     const r = root.current!;
-    const yaw = st.rot + angleTo(st.rot, 0) * lieB;
+    // стол: A — выдвигаем стул, B — садимся на него, C — придвигаемся
+    const deskA = smoother(clamp01(st.desk / 0.3));
+    const deskB = smoother(clamp01((st.desk - 0.3) / 0.45));
+    const deskC = smoother(clamp01((st.desk - 0.75) / 0.25));
+    props.deskChair = 0.45 * deskA - 0.28 * deskC;
+    const yaw = st.rot + angleTo(st.rot, 0) * lieB + angleTo(st.rot, Math.PI) * deskB;
     const tilt = LIE_TILT * lieB;
-    const chairLift = sitE * SIT_LIFT;
+    const chairLift = sitE * SIT_LIFT + deskB * DESK_LIFT;
     // где должен быть таз
     tmp.v.set(st.pos.x, HIP_Y, st.pos.z);
     tmp.v.x = THREE.MathUtils.lerp(tmp.v.x, SPOTS.chairSeat.x, sitE);
@@ -289,6 +324,11 @@ export function Character() {
       tmp.v.lerp(BED_EDGE, lieA);
       tmp.v.lerp(BED_HIP, lieB);
     }
+    if (st.desk > 0) {
+      tmp.v.x = THREE.MathUtils.lerp(tmp.v.x, DESK_SEAT1.x, deskB);
+      tmp.v.z = THREE.MathUtils.lerp(tmp.v.z, DESK_SEAT1.z, deskB);
+      tmp.v.z = THREE.MathUtils.lerp(tmp.v.z, DESK_SEAT2.z, deskC);
+    }
     // корень = таз минус повёрнутое смещение таза
     const hipH = HIP_Y + chairLift;
     const oy = hipH * Math.cos(tilt), oz = hipH * Math.sin(tilt);
@@ -297,7 +337,7 @@ export function Character() {
     poseG.current!.rotation.x = tilt;
     const px = tmp.v.x, pz = tmp.v.z;
     // ноги согнуты, когда сидим в кресле или на краю кровати
-    const legBend = Math.max(sitE, lieA * (1 - lieB));
+    const legBend = Math.max(sitE, lieA * (1 - lieB), deskB);
 
     // ---- Сценарий музыки ----
     const listening = phase === "listening" && st.onHead > 0.98;
@@ -306,6 +346,7 @@ export function Character() {
     hero.pose = control.pose;
     hero.sit = st.sit;
     hero.lie = st.lie;
+    hero.desk = st.desk;
     hero.moving = speed > 0.15;
     hero.listening = listening;
 
@@ -334,21 +375,35 @@ export function Character() {
     const reaching = Math.max(reachCarry * 0.7, reachHead);
     st.hold = damp(st.hold, listening && speed < 0.2 ? 1 : 0, 3, dt);
     const h = st.hold * (1 - reaching);
-    const freeArm = 1 - Math.max(reaching, h);
+    // какао: тянемся к кружке (grab) и подносим ко рту (sip) правой рукой
+    const d = st.drink;
+    const grab = d > 0 ? smoother(clamp01(d / 0.2)) * smoother(clamp01((1 - d) / 0.15)) : 0;
+    const sip = d > 0 ? smoother(clamp01((d - 0.22) / 0.2)) * smoother(clamp01((0.82 - d) / 0.2)) : 0;
+    const reachMug = Math.sin(clamp01(d / 0.22) * Math.PI) * 0.6 + Math.sin(clamp01((d - 0.82) / 0.18) * Math.PI) * 0.6;
+    // за столом: тянем стул (A), потом руки ложатся на столешницу (C)
+    const pull = Math.sin(deskA * Math.PI) * (1 - deskB);
+    const onDesk = deskC;
+    const freeArm = 1 - Math.max(reaching, h, pull, onDesk);
     // в кресле локти лежат на подлокотниках, предплечья вперёд
     const elbow = sitE * freeArm;
+    const freeR = 1 - Math.max(grab, reachMug);
     // на кровати руки вдоль тела, ладони на животе
     const rest = lieB * freeArm;
     armL.current!.rotation.x = -swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5;
-    armR.current!.rotation.x = swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5;
+    armR.current!.rotation.x = (swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5) * freeR - reachMug * 1.0 - sip * 1.2 - (grab - sip) * 0.25;
     armL.current!.rotation.z = -0.25 - reaching * 0.2 - h * 1.65 - elbow * 0.6 + rest * 0.1 + groove * 0.4;
-    armR.current!.rotation.z = 0.25 + reaching * 0.2 + h * 1.65 + elbow * 0.6 - rest * 0.1 + groove * 0.4;
+    armR.current!.rotation.z = (0.25 + reaching * 0.2 + h * 1.65 + elbow * 0.6 - rest * 0.1 + groove * 0.4) * freeR + (reachMug + grab) * 0.15 - sip * 0.05;
     foreL.current!.rotation.x = -reaching * 0.9 - elbow * 1.35 - rest * 1.2;
-    foreR.current!.rotation.x = -reaching * 0.9 - elbow * 1.35 - rest * 1.2;
+    foreR.current!.rotation.x = (-reaching * 0.9 - elbow * 1.35 - rest * 1.2) * freeR - reachMug * 0.3 - sip * 1.85 - (grab - sip) * 0.9;
     foreL.current!.rotation.z = -h * 1.6 + elbow * 0.45 + rest * 0.6;
-    foreR.current!.rotation.z = h * 1.6 - elbow * 0.45 - rest * 0.6;
+    foreR.current!.rotation.z = (h * 1.6 - elbow * 0.45 - rest * 0.6) * freeR - sip * 0.35;
+    // стул и стол: обе руки вперёд
+    for (const [arm, fore] of [[armL, foreL], [armR, foreR]] as const) {
+      arm.current!.rotation.x += -pull * 1.1 - onDesk * 0.55;
+      fore.current!.rotation.x += -pull * 0.25 - onDesk * 1.05;
+    }
 
-    head.current!.rotation.x = groove * 1.1 - 0.06 * st.settle - 0.25 * lieE;
+    head.current!.rotation.x = groove * 1.1 - 0.06 * st.settle - 0.25 * lieE + sip * 0.18 + onDesk * 0.12;
     head.current!.rotation.z = groove * 0.7;
     head.current!.rotation.y = speed < 0.05 && !listening && control.pose === "stand" ? Math.sin(t * 0.5) * 0.15 : 0;
 
@@ -386,6 +441,16 @@ export function Character() {
     hp.quaternion.slerpQuaternions(tmp.restQ, tmp.carryQ, carryE);
     hp.scale.setScalar(THREE.MathUtils.lerp(0.75, THREE.MathUtils.lerp(0.95, 1, onHeadE), carryE));
     mats.hpPad.emissiveIntensity = st.settle * (0.25 + live.level * 1.2);
+
+    // ---- Кружка: на столике или в правой руке ----
+    handR.current!.getWorldPosition(tmp.handW);
+    const m = mug.current!;
+    m.position.lerpVectors(SPOTS.mugRest, tmp.handW, grab);
+    // у чиби короткие ручки: при глотке кружка чуть «подплывает» к губам
+    m.position.y += sip * 0.1;
+    tmp.mugE.set(-sip * 0.9, yaw, 0, "YXZ");
+    tmp.mugQ.setFromEuler(tmp.mugE);
+    m.quaternion.identity().slerp(tmp.mugQ, grab);
 
     // Дорожка над головой
     waveAnchor.current!.position.set(tmp.headW.x, tmp.headW.y + 0.62 - lieE * 0.1, tmp.headW.z);
@@ -494,6 +559,7 @@ export function Character() {
                 </mesh>
               )}
               <group ref={fore} position={[0, -0.19, 0]}>
+                {i === 1 && <object3D ref={handR} position={[0, -0.2, 0.06]} />}
                 <mesh position={[0, -0.08, 0]} castShadow material={longSleeves ? mats.top : mats.skin}>
                   <capsuleGeometry args={[longSleeves ? 0.08 : 0.065, 0.08, 6, 12]} />
                 </mesh>
@@ -605,9 +671,21 @@ export function Character() {
             <mesh position={[s * 0.055, 0, 0]} rotation-z={Math.PI / 2} material={mats.hpPad}>
               <cylinderGeometry args={[0.07, 0.07, 0.02, 20]} />
             </mesh>
-            <SoundWaves side={s} />
           </group>
         ))}
+      </group>
+
+      {/* кружка какао со столика */}
+      <group ref={mug} position={SPOTS.mugRest.toArray()}>
+        <mesh position={[0, -0.0, 0]} castShadow material={mats.mug}>
+          <cylinderGeometry args={[0.065, 0.06, 0.13, 20]} />
+        </mesh>
+        <mesh position={[0.07, 0.0, 0]} material={mats.mug}>
+          <torusGeometry args={[0.035, 0.012, 8, 16]} />
+        </mesh>
+        <mesh position={[0, 0.06, 0]} rotation-x={-Math.PI / 2} material={mats.cocoa}>
+          <circleGeometry args={[0.058, 20]} />
+        </mesh>
       </group>
 
       <group ref={waveAnchor}>

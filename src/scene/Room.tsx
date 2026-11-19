@@ -8,8 +8,13 @@ import { RoundedBox } from "@react-three/drei";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { live } from "./live";
+import { props } from "./sceneState";
 
-export const ROOM = 4; // полуразмер комнаты
+export const ROOM = 4; // от центра до стен (слева и сзади)
+/** Открытые стороны «кукольного домика» чуть дальше: комната шире. */
+export const ROOM_X = 5;
+export const ROOM_Z = 5;
+export const WARDROBE = { x: 4.3, z: -3.64 };
 export const WALL_H = 3.4;
 export const WINDOW = { x: 0.6, y: 2.0, w: 2.4, h: 1.6 };
 export const CHAIR = { x: -1.3, z: 0.9, rot: Math.PI / 4 };
@@ -34,6 +39,12 @@ export function Room() {
       leaf2: std("#6aa86b"),
       pot: std("#d0764f"),
       soil: std("#4a3426", 0.95),
+      cactus: std("#5f9a5a"),
+      spine: std("#fff6df", 0.5),
+      flower: std("#ff7aa8", 0.6),
+      pages: std("#f7f0de", 0.95),
+      gold: new THREE.MeshStandardMaterial({ color: "#e0b25b", roughness: 0.35, metalness: 0.6 }),
+      glass: new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12, depthWrite: false }),
       // акценты, следуют палитре
       rug: std("#c9b79c"),
       blanket: std("#8fa39a"),
@@ -80,6 +91,7 @@ export function Room() {
       <Plant position={[3.3, 0, -1.6]} mats={mats} scale={1.1} />
       <Plant position={[-3.3, 0, 2.9]} mats={mats} scale={0.85} />
       <FloorLamp mats={mats} />
+      <Wardrobe mats={mats} />
       {/* круглый ковёр под креслом */}
       <mesh position={[CHAIR.x + 0.2, 0.012, CHAIR.z + 0.2]} rotation-x={-Math.PI / 2} receiveShadow material={mats.rug}>
         <circleGeometry args={[1.5, 48]} />
@@ -99,6 +111,8 @@ function useMatsType() {
     wall2: THREE.MeshStandardMaterial; trim: THREE.MeshStandardMaterial; wood: THREE.MeshStandardMaterial;
     woodLight: THREE.MeshStandardMaterial; white: THREE.MeshStandardMaterial; metal: THREE.MeshStandardMaterial;
     leaf: THREE.MeshStandardMaterial; leaf2: THREE.MeshStandardMaterial; pot: THREE.MeshStandardMaterial; soil: THREE.MeshStandardMaterial;
+    cactus: THREE.MeshStandardMaterial; spine: THREE.MeshStandardMaterial; flower: THREE.MeshStandardMaterial;
+    pages: THREE.MeshStandardMaterial; gold: THREE.MeshStandardMaterial; glass: THREE.MeshStandardMaterial;
     rug: THREE.MeshStandardMaterial; blanket: THREE.MeshStandardMaterial; cushion: THREE.MeshStandardMaterial;
     chair: THREE.MeshStandardMaterial; poster1: THREE.MeshStandardMaterial; poster2: THREE.MeshStandardMaterial;
     books: THREE.MeshStandardMaterial[];
@@ -108,10 +122,11 @@ function useMatsType() {
 function Floor({ mats }: { mats: Mats }) {
   // паркет полосами
   const planks = [];
-  for (let i = 0; i < 16; i++) {
+  const depth = ROOM + ROOM_Z;
+  for (let i = 0; i < (ROOM + ROOM_X) / 0.5; i++) {
     planks.push(
-      <mesh key={i} position={[-ROOM + 0.25 + i * 0.5, -0.05, 0]} receiveShadow material={i % 2 ? mats.floor : mats.floorDark}>
-        <boxGeometry args={[0.49, 0.1, ROOM * 2]} />
+      <mesh key={i} position={[-ROOM + 0.25 + i * 0.5, -0.05, (ROOM_Z - ROOM) / 2]} receiveShadow material={i % 2 ? mats.floor : mats.floorDark}>
+        <boxGeometry args={[0.49, 0.1, depth]} />
       </mesh>,
     );
   }
@@ -119,8 +134,8 @@ function Floor({ mats }: { mats: Mats }) {
     <group>
       {planks}
       {/* «срез» пола, как у кукольного домика */}
-      <mesh position={[0, -0.25, 0]} material={mats.wood}>
-        <boxGeometry args={[ROOM * 2 + 0.3, 0.3, ROOM * 2 + 0.3]} />
+      <mesh position={[(ROOM_X - ROOM) / 2, -0.25, (ROOM_Z - ROOM) / 2]} material={mats.wood}>
+        <boxGeometry args={[ROOM + ROOM_X + 0.3, 0.3, ROOM + ROOM_Z + 0.3]} />
       </mesh>
     </group>
   );
@@ -130,7 +145,7 @@ function Walls({ mats }: { mats: Mats }) {
   const t = 0.2;
   const { x, y, w, h } = WINDOW;
   const left = x - w / 2 + ROOM; // ширина стены слева от окна
-  const right = ROOM - (x + w / 2);
+  const right = ROOM_X - (x + w / 2);
   return (
     <group>
       {/* задняя стена с проёмом под окно */}
@@ -138,7 +153,7 @@ function Walls({ mats }: { mats: Mats }) {
         <mesh position={[-ROOM + left / 2, WALL_H / 2, 0]} receiveShadow castShadow material={mats.wall}>
           <boxGeometry args={[left, WALL_H, t]} />
         </mesh>
-        <mesh position={[ROOM - right / 2, WALL_H / 2, 0]} receiveShadow castShadow material={mats.wall}>
+        <mesh position={[ROOM_X - right / 2, WALL_H / 2, 0]} receiveShadow castShadow material={mats.wall}>
           <boxGeometry args={[right, WALL_H, t]} />
         </mesh>
         <mesh position={[x, (y - h / 2) / 2, 0]} receiveShadow castShadow material={mats.wall}>
@@ -148,8 +163,8 @@ function Walls({ mats }: { mats: Mats }) {
           <boxGeometry args={[w, WALL_H - y - h / 2, t]} />
         </mesh>
         {/* плинтус */}
-        <mesh position={[0, 0.08, t / 2 + 0.02]} material={mats.trim}>
-          <boxGeometry args={[ROOM * 2, 0.16, 0.04]} />
+        <mesh position={[(ROOM_X - ROOM) / 2, 0.08, t / 2 + 0.02]} material={mats.trim}>
+          <boxGeometry args={[ROOM + ROOM_X, 0.16, 0.04]} />
         </mesh>
         {/* рама окна */}
         <group position={[x, y, t / 2]}>
@@ -170,23 +185,16 @@ function Walls({ mats }: { mats: Mats }) {
             <boxGeometry args={[w + 0.4, 0.06, 0.34]} />
           </mesh>
         </group>
-        {/* постеры */}
-        <mesh position={[-2.4, 2.1, t / 2 + 0.01]} material={mats.poster1}>
-          <planeGeometry args={[0.9, 1.2]} />
-        </mesh>
-        <mesh position={[-2.4, 2.1, t / 2 + 0.005]} material={mats.white}>
-          <planeGeometry args={[1.0, 1.3]} />
-        </mesh>
-        <mesh position={[3.0, 2.35, t / 2 + 0.01]} material={mats.poster2}>
-          <circleGeometry args={[0.36, 32]} />
-        </mesh>
+        {/* картина над кроватью и часы над столом */}
+        <Painting position={[-2.85, 2.15, t / 2]} mats={mats} />
+        <WallClock position={[3.0, 2.35, t / 2]} mats={mats} />
       </group>
       {/* левая стена */}
-      <mesh position={[-ROOM - t / 2, WALL_H / 2, 0]} receiveShadow castShadow material={mats.wall2}>
-        <boxGeometry args={[t, WALL_H, ROOM * 2 + t * 2]} />
+      <mesh position={[-ROOM - t / 2, WALL_H / 2, (ROOM_Z - ROOM) / 2]} receiveShadow castShadow material={mats.wall2}>
+        <boxGeometry args={[t, WALL_H, ROOM + ROOM_Z + t * 2]} />
       </mesh>
-      <mesh position={[-ROOM + 0.02, 0.08, 0]} material={mats.trim}>
-        <boxGeometry args={[0.04, 0.16, ROOM * 2]} />
+      <mesh position={[-ROOM + 0.02, 0.08, (ROOM_Z - ROOM) / 2]} material={mats.trim}>
+        <boxGeometry args={[0.04, 0.16, ROOM + ROOM_Z]} />
       </mesh>
     </group>
   );
@@ -234,8 +242,20 @@ function Desk({ mats }: { mats: Mats }) {
       <mesh position={[-0.73, 0.91, -0.15]} rotation-y={0.2} castShadow material={mats.books[3]}>
         <boxGeometry args={[0.3, 0.07, 0.4]} />
       </mesh>
-      {/* стул */}
-      <group position={[-0.1, 0, 0.75]}>
+      {/* стул: выдвигается, когда персонаж садится за стол */}
+      <DeskChair mats={mats} />
+    </group>
+  );
+}
+
+function DeskChair({ mats }: { mats: Mats }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (ref.current) ref.current.position.z = 0.75 + props.deskChair;
+  });
+  return (
+    <group>
+      <group ref={ref} position={[-0.1, 0, 0.75]}>
         <mesh position={[0, 0.46, 0]} castShadow material={mats.wood}>
           <boxGeometry args={[0.5, 0.06, 0.5]} />
         </mesh>
@@ -276,18 +296,34 @@ function SideTable({ mats }: { mats: Mats }) {
       <mesh position={[0, 0.02, 0]} material={mats.wood}>
         <cylinderGeometry args={[0.22, 0.24, 0.04, 24]} />
       </mesh>
-      {/* кружка какао, как на референсе */}
-      <group position={[0.14, 0.61, 0.12]}>
-        <mesh castShadow material={mats.white}>
-          <cylinderGeometry args={[0.065, 0.06, 0.13, 20]} />
-        </mesh>
-        <mesh position={[0.07, 0.07, 0]} material={mats.white}>
-          <torusGeometry args={[0.035, 0.012, 8, 16]} />
-        </mesh>
-        <mesh position={[0, 0.125, 0]} rotation-x={-Math.PI / 2} material={mats.wood}>
-          <circleGeometry args={[0.058, 20]} />
-        </mesh>
-      </group>
+    </group>
+  );
+}
+
+function Book({ w, h, d, cover, mats, lean = 0 }: { w: number; h: number; d: number; cover: THREE.Material; mats: Mats; lean?: number }) {
+  // Корешок смотрит в комнату (+x), обложки по бокам, блок страниц чуть утоплен
+  const c = 0.012;
+  return (
+    <group rotation-x={lean}>
+      <mesh position={[0, h / 2, -w / 2 + c / 2]} castShadow material={cover}>
+        <boxGeometry args={[d, h, c]} />
+      </mesh>
+      <mesh position={[0, h / 2, w / 2 - c / 2]} castShadow material={cover}>
+        <boxGeometry args={[d, h, c]} />
+      </mesh>
+      <mesh position={[d / 2 - c / 2, h / 2, 0]} castShadow material={cover}>
+        <boxGeometry args={[c, h, w]} />
+      </mesh>
+      <mesh position={[-c / 2, h / 2 - 0.006, 0]} material={mats.pages}>
+        <boxGeometry args={[d - c * 1.5, h - 0.018, w - c * 2]} />
+      </mesh>
+      {/* полоски на корешке */}
+      <mesh position={[d / 2 + 0.001, h * 0.8, 0]} material={mats.gold}>
+        <boxGeometry args={[0.004, 0.012, w * 0.8]} />
+      </mesh>
+      <mesh position={[d / 2 + 0.001, h * 0.2, 0]} material={mats.gold}>
+        <boxGeometry args={[0.004, 0.012, w * 0.8]} />
+      </mesh>
     </group>
   );
 }
@@ -296,38 +332,252 @@ function Shelves({ mats }: { mats: Mats }) {
   const shelf = (y: number, seed: number) => {
     const books = [];
     let z = -0.75;
-    for (let i = 0; z < 0.6; i++) {
+    for (let i = 0; z < 0.45; i++) {
       const w = 0.07 + ((i * 7 + seed) % 5) * 0.02;
       const h = 0.28 + ((i * 3 + seed) % 4) * 0.05;
+      const d = 0.2 + ((i + seed) % 3) * 0.02;
+      // последняя книга в ряду чуть наклонена
+      const lean = z + w > 0.38 ? 0.22 : 0;
       books.push(
-        <mesh key={i} position={[0, y + h / 2 + 0.03, z + w / 2]} castShadow material={mats.books[(i + seed) % mats.books.length]}>
-          <boxGeometry args={[0.24, h, w]} />
-        </mesh>,
+        <group key={i} position={[0, y + 0.025, z + w / 2 + (lean ? 0.04 : 0)]}>
+          <Book w={w} h={h} d={d} lean={lean} cover={mats.books[(i + seed) % mats.books.length]} mats={mats} />
+        </group>,
       );
-      z += w + 0.01;
+      z += w + 0.006;
     }
+    // стопка лёжа: видно обрез страниц
+    const stack = [0, 1, 2].map((k) => (
+      <group key={"s" + k} position={[0, y + 0.025 + k * 0.055, 0.62]} rotation-x={Math.PI / 2} rotation-z={(k - 1) * 0.12}>
+        <group position={[0, -0.13, 0]}>
+          <Book w={0.05} h={0.26} d={0.19} cover={mats.books[(k * 2 + seed + 1) % mats.books.length]} mats={mats} />
+        </group>
+      </group>
+    ));
     return (
       <group key={y}>
         <mesh position={[0, y, 0]} castShadow receiveShadow material={mats.woodLight}>
           <boxGeometry args={[0.32, 0.05, 1.7]} />
         </mesh>
         {books}
+        {seed === 0 && stack}
       </group>
     );
   };
+  // колючки кактуса
+  const spines = useMemo(() => {
+    const out: { p: [number, number, number]; r: [number, number, number] }[] = [];
+    for (let row = 0; row < 6; row++)
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + (row % 2) * 0.4;
+        const y = 0.12 + row * 0.035;
+        const rad = row === 5 ? 0.03 : 0.047;
+        out.push({ p: [Math.cos(a) * rad, y, Math.sin(a) * rad], r: [0, -a, -Math.PI / 2 + (row === 5 ? 0.6 : 0)] });
+      }
+    return out;
+  }, []);
   return (
     <group position={[-ROOM + 0.17, 0, 1.9]}>
       {shelf(1.5, 0)}
       {shelf(2.2, 2)}
-      {/* маленький кактус на полке */}
-      <group position={[0, 2.22, 0.75]}>
+      {/* маленький кактус на полке: рёбра, колючки и цветок */}
+      <group position={[0, 2.22, 0.68]}>
         <mesh position={[0, 0.07, 0]} material={mats.pot}>
           <cylinderGeometry args={[0.07, 0.055, 0.13, 12]} />
         </mesh>
-        <mesh position={[0, 0.2, 0]} material={mats.leaf}>
-          <capsuleGeometry args={[0.045, 0.12, 4, 8]} />
+        <mesh position={[0, 0.135, 0]} rotation-x={-Math.PI / 2} material={mats.soil}>
+          <circleGeometry args={[0.065, 12]} />
+        </mesh>
+        <mesh position={[0, 0.2, 0]} material={mats.cactus}>
+          <capsuleGeometry args={[0.045, 0.12, 4, 10]} />
+        </mesh>
+        {[0, 1, 2, 3, 4, 5].map((k) => (
+          <mesh key={k} position={[Math.cos((k / 6) * Math.PI * 2) * 0.04, 0.2, Math.sin((k / 6) * Math.PI * 2) * 0.04]} material={mats.leaf}>
+            <capsuleGeometry args={[0.012, 0.12, 3, 6]} />
+          </mesh>
+        ))}
+        {spines.map((sp, i) => (
+          <mesh key={i} position={sp.p} rotation={sp.r} material={mats.spine}>
+            <coneGeometry args={[0.004, 0.028, 4]} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.275, 0]} material={mats.flower}>
+          <sphereGeometry args={[0.018, 8, 6]} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+function Wardrobe({ mats }: { mats: Mats }) {
+  const W = 1.3, H = 2.3, D = 0.68;
+  return (
+    <group position={[WARDROBE.x, 0, WARDROBE.z]}>
+      <mesh position={[0, H / 2 + 0.06, 0]} castShadow receiveShadow material={mats.wood}>
+        <boxGeometry args={[W, H, D]} />
+      </mesh>
+      {/* карниз и цоколь */}
+      <mesh position={[0, H + 0.09, 0.01]} castShadow material={mats.woodLight}>
+        <boxGeometry args={[W + 0.08, 0.06, D + 0.06]} />
+      </mesh>
+      <mesh position={[0, 0.03, 0.01]} material={mats.woodLight}>
+        <boxGeometry args={[W - 0.06, 0.06, D - 0.04]} />
+      </mesh>
+      {/* две дверцы с филёнками и ручками */}
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * (W / 4), 0, D / 2]}>
+          <mesh position={[0, 1.36, 0.012]} castShadow material={mats.woodLight}>
+            <boxGeometry args={[W / 2 - 0.05, 1.7, 0.025]} />
+          </mesh>
+          <mesh position={[0, 1.62, 0.028]} material={mats.wood}>
+            <boxGeometry args={[W / 2 - 0.2, 0.9, 0.01]} />
+          </mesh>
+          <mesh position={[0, 0.85, 0.028]} material={mats.wood}>
+            <boxGeometry args={[W / 2 - 0.2, 0.45, 0.01]} />
+          </mesh>
+          <mesh position={[-s * (W / 4 - 0.07), 1.3, 0.05]} material={mats.metal}>
+            <sphereGeometry args={[0.025, 10, 8]} />
+          </mesh>
+        </group>
+      ))}
+      {/* выдвижной ящик внизу */}
+      <mesh position={[0, 0.3, D / 2 + 0.012]} castShadow material={mats.woodLight}>
+        <boxGeometry args={[W - 0.08, 0.36, 0.025]} />
+      </mesh>
+      <mesh position={[0, 0.3, D / 2 + 0.04]} rotation-z={Math.PI / 2} material={mats.metal}>
+        <capsuleGeometry args={[0.012, 0.16, 4, 8]} />
+      </mesh>
+      {/* коробка и плюшевый мяч наверху */}
+      <mesh position={[-0.25, H + 0.24, 0]} rotation-y={0.2} castShadow material={mats.cushion}>
+        <boxGeometry args={[0.45, 0.24, 0.4]} />
+      </mesh>
+      <mesh position={[0.3, H + 0.22, 0.05]} castShadow material={mats.poster2}>
+        <sphereGeometry args={[0.1, 16, 12]} />
+      </mesh>
+    </group>
+  );
+}
+
+function makePaintingTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 360;
+  const g = c.getContext("2d")!;
+  const sky = g.createLinearGradient(0, 0, 0, 260);
+  sky.addColorStop(0, "#f6c8a6");
+  sky.addColorStop(0.55, "#f9e2c2");
+  sky.addColorStop(1, "#cfe0dc");
+  g.fillStyle = sky;
+  g.fillRect(0, 0, 512, 360);
+  g.fillStyle = "#fff4d6";
+  g.beginPath();
+  g.arc(360, 120, 46, 0, Math.PI * 2);
+  g.fill();
+  const hill = (y: number, amp: number, color: string, ph: number) => {
+    g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(0, 360);
+    for (let x = 0; x <= 512; x += 8) g.lineTo(x, y + Math.sin(x / 70 + ph) * amp + Math.sin(x / 31 + ph * 2) * amp * 0.3);
+    g.lineTo(512, 360);
+    g.fill();
+  };
+  hill(205, 22, "#a7c3b6", 0.4);
+  hill(245, 18, "#7fa58f", 1.7);
+  hill(290, 14, "#5e8a6e", 3.1);
+  // мазки, будто масло
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = `rgba(255,255,255,${Math.random() * 0.06})`;
+    g.fillRect(Math.random() * 512, Math.random() * 360, 10 + Math.random() * 18, 2 + Math.random() * 3);
+  }
+  // домик и дерево
+  g.fillStyle = "#d9775a";
+  g.fillRect(120, 250, 38, 28);
+  g.beginPath();
+  g.moveTo(114, 252);
+  g.lineTo(139, 230);
+  g.lineTo(164, 252);
+  g.fill();
+  g.fillStyle = "#3f5d4a";
+  g.beginPath();
+  g.arc(205, 250, 18, 0, Math.PI * 2);
+  g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function Painting({ position, mats }: { position: [number, number, number]; mats: Mats }) {
+  const art = useMemo(() => new THREE.MeshStandardMaterial({ map: makePaintingTexture(), roughness: 0.8 }), []);
+  const W = 1.3, H = 0.92;
+  return (
+    <group position={position}>
+      {/* рама */}
+      <mesh position={[0, 0, 0.03]} castShadow material={mats.woodLight}>
+        <boxGeometry args={[W + 0.14, H + 0.14, 0.06]} />
+      </mesh>
+      <mesh position={[0, 0, 0.061]} material={mats.white}>
+        <planeGeometry args={[W + 0.02, H + 0.02]} />
+      </mesh>
+      <mesh position={[0, 0, 0.063]} material={art}>
+        <planeGeometry args={[W - 0.08, H - 0.08]} />
+      </mesh>
+    </group>
+  );
+}
+
+function WallClock({ position, mats }: { position: [number, number, number]; mats: Mats }) {
+  const hour = useRef<THREE.Group>(null);
+  const minute = useRef<THREE.Group>(null);
+  const second = useRef<THREE.Group>(null);
+  useFrame(() => {
+    // реальное время
+    const d = new Date();
+    const s = d.getSeconds() + d.getMilliseconds() / 1000;
+    const m = d.getMinutes() + s / 60;
+    const h = (d.getHours() % 12) + m / 60;
+    second.current!.rotation.z = -(s / 60) * Math.PI * 2;
+    minute.current!.rotation.z = -(m / 60) * Math.PI * 2;
+    hour.current!.rotation.z = -(h / 12) * Math.PI * 2;
+  });
+  const R = 0.34;
+  return (
+    <group position={position}>
+      <mesh position={[0, 0, 0.035]} rotation-x={Math.PI / 2} castShadow material={mats.wood}>
+        <cylinderGeometry args={[R + 0.04, R + 0.04, 0.07, 40]} />
+      </mesh>
+      <mesh position={[0, 0, 0.071]} material={mats.white}>
+        <circleGeometry args={[R, 40]} />
+      </mesh>
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        const big = i % 3 === 0;
+        return (
+          <mesh key={i} position={[Math.sin(a) * (R - 0.05), Math.cos(a) * (R - 0.05), 0.074]} rotation-z={-a} material={mats.metal}>
+            <boxGeometry args={[big ? 0.022 : 0.012, big ? 0.06 : 0.035, 0.004]} />
+          </mesh>
+        );
+      })}
+      <group ref={hour} position={[0, 0, 0.078]}>
+        <mesh position={[0, 0.08, 0]} material={mats.metal}>
+          <boxGeometry args={[0.024, 0.17, 0.006]} />
+        </mesh>
+      </group>
+      <group ref={minute} position={[0, 0, 0.083]}>
+        <mesh position={[0, 0.12, 0]} material={mats.metal}>
+          <boxGeometry args={[0.016, 0.25, 0.006]} />
+        </mesh>
+      </group>
+      <group ref={second} position={[0, 0, 0.088]}>
+        <mesh position={[0, 0.1, 0]} material={mats.pot}>
+          <boxGeometry args={[0.006, 0.26, 0.004]} />
+        </mesh>
+      </group>
+      <mesh position={[0, 0, 0.092]} material={mats.pot}>
+        <circleGeometry args={[0.018, 16]} />
+      </mesh>
+      {/* стекло */}
+      <mesh position={[0, 0, 0.095]} material={mats.glass}>
+        <circleGeometry args={[R, 40]} />
+      </mesh>
     </group>
   );
 }
@@ -391,8 +641,9 @@ function FloorLamp({ mats }: { mats: Mats }) {
       <mesh position={[0, 0.8, 0]} material={mats.metal}>
         <cylinderGeometry args={[0.02, 0.02, 1.6, 8]} />
       </mesh>
-      <mesh position={[0, 1.65, 0]} material={mats.cushion}>
-        <cylinderGeometry args={[0.18, 0.28, 0.32, 20, 1, true]} />
+      {/* держатель абажура; сам светящийся абажур — в AtmosphereRig */}
+      <mesh position={[0, 1.62, 0]} material={mats.metal}>
+        <torusGeometry args={[0.05, 0.008, 6, 16]} />
       </mesh>
     </group>
   );

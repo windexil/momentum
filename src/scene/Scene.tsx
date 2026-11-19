@@ -1,5 +1,5 @@
-import { Canvas } from "@react-three/fiber";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
+import { Canvas, useThree } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
 import { Suspense } from "react";
 import * as THREE from "three";
 import { Album3D } from "./Album3D";
@@ -15,7 +15,7 @@ export function Scene() {
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={{ position: [8.6, 7.4, 8.6], fov: 36, near: 0.1, far: 80 }}
+      camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
     >
       <Suspense fallback={null}>
@@ -27,14 +27,14 @@ export function Scene() {
         <Interact />
         <CameraZoom />
         <Particles />
-        <ContactShadows position={[0, 0.005, 0]} scale={9} blur={2.4} opacity={0.35} far={2} resolution={512} />
+        {import.meta.env.DEV && <DevHandle />}
       </Suspense>
       <OrbitControls
         makeDefault
-        target={[-0.2, 1.0, -0.4]}
+        target={[0.3, 1.0, 0.1]}
         enablePan={false}
         minDistance={4.5}
-        maxDistance={16}
+        maxDistance={18}
         minPolarAngle={0.55}
         maxPolarAngle={1.25}
         minAzimuthAngle={0.15}
@@ -44,4 +44,11 @@ export function Scene() {
       />
     </Canvas>
   );
+}
+
+/** Только в режиме разработки: доступ к камере из консоли и тестов. */
+function DevHandle() {
+  const state = useThree();
+  (window as unknown as { __three: unknown }).__three = state;
+  return null;
 }
