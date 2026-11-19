@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { Album3D } from "./Album3D";
 import { AtmosphereRig } from "./AtmosphereRig";
 import { Character } from "./Character";
-import { CameraFollow, Interact } from "./Interact";
+import { CameraZoom, Interact } from "./Interact";
 import { Particles } from "./Particles";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
@@ -25,7 +25,7 @@ export function Scene() {
         <Character />
         <Pet />
         <Interact />
-        <CameraFollow />
+        <CameraZoom />
         <Particles />
         <ContactShadows position={[0, 0.005, 0]} scale={9} blur={2.4} opacity={0.35} far={2} resolution={512} />
       </Suspense>

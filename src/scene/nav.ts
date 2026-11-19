@@ -63,3 +63,93 @@ export function nearestFree(x: number, z: number, r: number): THREE.Vector3 {
   }
   return new THREE.Vector3(0, 0, 0);
 }
+
+// ---------- Поиск пути (A* по сетке) ----------
+const CELL = 0.12;
+const N = Math.ceil((BOUNDS * 2) / CELL);
+const toCell = (v: number) => Math.max(0, Math.min(N - 1, Math.round((v + BOUNDS) / CELL)));
+const toWorld = (i: number) => i * CELL - BOUNDS;
+let grid: Uint8Array | null = null;
+let gridR = 0;
+function getGrid(r: number) {
+  if (grid && gridR === r) return grid;
+  grid = new Uint8Array(N * N);
+  gridR = r;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) grid[j * N + i] = blocked(toWorld(i), toWorld(j), r + 0.03) ? 1 : 0;
+  return grid;
+}
+
+/** Есть ли прямая видимость между точками (без столкновений). */
+export function clearLine(a: THREE.Vector3, b: THREE.Vector3, r: number): boolean {
+  const d = Math.hypot(b.x - a.x, b.z - a.z);
+  const steps = Math.max(2, Math.ceil(d / 0.05));
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    if (blocked(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, r)) return false;
+  }
+  return true;
+}
+
+/** Маршрут в обход мебели: список точек до цели (последняя — сама цель). */
+export function findPath(from: THREE.Vector3, to: THREE.Vector3, r: number): THREE.Vector3[] {
+  if (clearLine(from, to, r)) return [to.clone()];
+  const g = getGrid(r);
+  const free = (i: number, j: number) => i >= 0 && j >= 0 && i < N && j < N && !g[j * N + i];
+  const snap = (p: THREE.Vector3) => {
+    let bi = toCell(p.x), bj = toCell(p.z);
+    if (free(bi, bj)) return [bi, bj];
+    for (let rad = 1; rad < 12; rad++)
+      for (let di = -rad; di <= rad; di++)
+        for (let dj = -rad; dj <= rad; dj++) if (free(bi + di, bj + dj)) return [bi + di, bj + dj];
+    return [bi, bj];
+  };
+  const [si, sj] = snap(from), [gi, gj] = snap(to);
+  const start = sj * N + si, goal = gj * N + gi;
+  const gScore = new Float32Array(N * N).fill(Infinity);
+  const came = new Int32Array(N * N).fill(-1);
+  const closed = new Uint8Array(N * N);
+  const open: number[] = [start];
+  const f = new Float32Array(N * N).fill(Infinity);
+  gScore[start] = 0;
+  const h = (c: number) => Math.hypot((c % N) - gi, Math.floor(c / N) - gj);
+  f[start] = h(start);
+  while (open.length) {
+    let bi = 0;
+    for (let k = 1; k < open.length; k++) if (f[open[k]] < f[open[bi]]) bi = k;
+    const cur = open.splice(bi, 1)[0];
+    if (cur === goal) break;
+    closed[cur] = 1;
+    const ci = cur % N, cj = Math.floor(cur / N);
+    for (let di = -1; di <= 1; di++)
+      for (let dj = -1; dj <= 1; dj++) {
+        if (!di && !dj) continue;
+        const ni = ci + di, nj = cj + dj;
+        if (!free(ni, nj)) continue;
+        if (di && dj && (!free(ci + di, cj) || !free(ci, cj + dj))) continue; // не срезаем углы
+        const n = nj * N + ni;
+        if (closed[n]) continue;
+        const tg = gScore[cur] + (di && dj ? Math.SQRT2 : 1);
+        if (tg < gScore[n]) {
+          came[n] = cur;
+          gScore[n] = tg;
+          f[n] = tg + h(n);
+          if (!open.includes(n)) open.push(n);
+        }
+      }
+  }
+  if (came[goal] === -1 && goal !== start) return [to.clone()];
+  const cells: THREE.Vector3[] = [];
+  for (let c = goal; c !== -1 && c !== start; c = came[c]) cells.push(new THREE.Vector3(toWorld(c % N), 0, toWorld(Math.floor(c / N))));
+  cells.reverse();
+  cells.push(to.clone());
+  // сглаживаем: выкидываем точки, если следующую видно напрямую
+  const out: THREE.Vector3[] = [];
+  let anchor = from.clone();
+  for (let k = 0; k < cells.length; k++) {
+    const next = cells[k + 1];
+    if (next && clearLine(anchor, next, r)) continue;
+    out.push(cells[k]);
+    anchor = cells[k];
+  }
+  return out.length ? out : [to.clone()];
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { checkAi } from "../atmosphere/analyze";
 import { useStore } from "../store";
 import { PARTICLE_RU } from "./NewMemoryForm";
-import { ActionBar, Joystick, KeyHint } from "./Controls";
+import { ActionBar, KeyHint } from "./Controls";
 
 const PHASE_TEXT: Record<string, string> = {
   walking: "Готовлюсь слушать…",
@@ -83,7 +83,6 @@ export function Hud() {
       </nav>
 
       {panel === "none" && <ActionBar />}
-      {panel === "none" && <Joystick />}
       {panel === "none" && <KeyHint />}
       {hint && <div className="toast">{hint}</div>}
     </>

@@ -231,17 +231,6 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 
 /* ---------- управление ---------- */
-.joystick {
-  position: fixed; left: max(22px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  width: 116px; height: 116px; border-radius: 50%; touch-action: none; user-select: none;
-  background: radial-gradient(circle, rgba(255,255,255,.08), rgba(255,255,255,.18));
-  border: 1px solid var(--glass-line); backdrop-filter: blur(8px); display: grid; place-items: center; cursor: grab;
-}
-.joystick.active { cursor: grabbing; background: radial-gradient(circle, rgba(224,122,95,.15), rgba(255,255,255,.22)); }
-.joystick .knob {
-  width: 48px; height: 48px; border-radius: 50%; background: var(--paper); box-shadow: 0 4px 14px rgba(0,0,0,.35);
-  transition: transform .06s linear; pointer-events: none;
-}
 .actions {
   position: fixed; right: max(22px, env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -256,11 +245,10 @@ button:disabled { opacity: 0.45; cursor: default; }
   border-radius: 99px; background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(8px);
   white-space: nowrap; pointer-events: none; animation: fade .5s both;
 }
-@media (pointer: coarse) { .keyhint { display: none; } }
+@media (max-width: 700px) { .keyhint { white-space: normal; width: calc(100% - 32px); text-align: center; bottom: auto; top: 112px; } }
 @media (max-width: 700px) {
   .dock { bottom: auto; top: 64px; }
   .dock button { padding: 8px 12px; font-size: 13px; }
-  .joystick { width: 104px; height: 104px; }
   .actions button { padding: 9px 13px; font-size: 13px; }
   .now { bottom: auto; top: 118px; }
   .onboard { display: none; }

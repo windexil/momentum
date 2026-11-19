@@ -1,6 +1,6 @@
 // Персонаж в «пластилиновом» чиби-стиле: большая голова, худи с капюшоном,
 // круглые формы. Одежда, цвета и наушники настраиваются (src/avatar.ts).
-// Управление: клавиатура, джойстик, клик по полу и мебели (heroControl.ts).
+// Управление: клик или тап по полу и мебели, кнопки действий (heroControl.ts).
 // Анимации процедурные и сглаженные: ходьба, посадка, лёжа на кровати,
 // перенос наушников со столика на шею и на голову, покачивание в такт.
 
@@ -12,7 +12,7 @@ import { useStore } from "../store";
 import { SoundWaves, Waveform } from "./SoundFx";
 import { control, heroCmd, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
-import { moveWithCollision } from "./nav";
+import { findPath, moveWithCollision } from "./nav";
 
 /** Общее состояние персонажа: по нему ориентируются питомец, камера и эффекты. */
 export const hero = {
@@ -33,7 +33,11 @@ const HEAD_R = 0.3;
 const SIT_LIFT = 0.17; // таз поднимается на подушку кресла
 const RADIUS = 0.22;
 const MAX_SPEED = 1.7;
-const DETOUR = new THREE.Vector3(0.5, 0, 0.6); // свободная середина комнаты
+// Кровать: сначала садимся на край, потом откидываемся на спину
+const BED_EDGE = new THREE.Vector3(-2.08, HIP_Y + 0.27, -1.9); // таз на краю матраса
+const BED_HIP = new THREE.Vector3(-2.72, 0.93, -2.5); // таз лёжа, голова на подушке
+const LIE_TILT = -Math.PI / 2 + 0.12; // чуть приподнятая голова
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 const damp = (a: number, b: number, rate: number, dt: number) => a + (b - a) * (1 - Math.exp(-rate * dt));
@@ -82,8 +86,10 @@ export function Character() {
       blink: 0,
       nextBlink: 2,
       stuck: 0,
-      detour: false,
       lastDist: Infinity,
+      path: [] as THREE.Vector3[],
+      pathFor: null as unknown,
+      replans: 0,
       request: 0,
       unwinding: false,
       uiPose: "stand" as Pose,
@@ -151,7 +157,7 @@ export function Character() {
     [],
   );
 
-  useFrame(({ clock, camera }, rawDt) => {
+  useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
     const store = useStore.getState();
@@ -174,19 +180,6 @@ export function Character() {
     // сняли наушники вручную во время музыки — музыка затихает
     if (phase === "listening" && control.hp !== "head") store.stopReliving();
 
-    // ---- Ввод ----
-    control.input.copy(control.keys).add(control.stick);
-    if (control.input.lengthSq() > 1) control.input.normalize();
-    const manual = control.input.lengthSq() > 0.004;
-    if (manual) {
-      if (control.queue.length) {
-        const preparing = control.queue.some((s) => s.k === "do");
-        heroCmd.clear();
-        if (preparing) control.onInterrupt?.();
-      }
-      if (control.pose !== "stand") control.pose = "stand";
-    }
-
     // ---- Очередь действий ----
     tmp.desired.set(0, 0, 0);
     let faceAngle: number | null = null;
@@ -196,36 +189,38 @@ export function Character() {
       if (step.k === "goto") {
         if (!free) control.pose = "stand";
         else {
-          const target = st.detour ? DETOUR : step.to;
+          // маршрут в обход мебели считаем один раз на шаг
+          if (st.pathFor !== step) {
+            st.pathFor = step;
+            st.path = findPath(st.pos, step.to, RADIUS);
+            st.stuck = 0;
+            st.replans = 0;
+            st.lastDist = Infinity;
+          }
+          while (st.path.length > 1 && Math.hypot(st.path[0].x - st.pos.x, st.path[0].z - st.pos.z) < 0.18) {
+            st.path.shift();
+            st.lastDist = Infinity;
+          }
+          const last = st.path.length <= 1;
+          const target = st.path[0] ?? step.to;
           tmp.v.copy(target).sub(st.pos).setY(0);
           const dist = tmp.v.length();
-          if (dist < (st.detour ? 0.3 : step.tol ?? 0.06)) {
-            if (st.detour) {
-              st.detour = false;
-              st.stuck = 0;
-              st.lastDist = Infinity;
-            } else if (step.face !== undefined && Math.abs(angleTo(st.rot, step.face)) > 0.06) {
-              faceAngle = step.face;
-            } else {
-              heroCmd.shift();
-              st.stuck = 0;
-              st.lastDist = Infinity;
-            }
+          if (last && dist < (step.tol ?? 0.06)) {
+            if (step.face !== undefined && Math.abs(angleTo(st.rot, step.face)) > 0.06) faceAngle = step.face;
+            else heroCmd.shift();
           } else {
-            const speed = Math.min(MAX_SPEED, dist * 2.2 + 0.25);
+            // на промежуточных точках не тормозим, у цели мягко останавливаемся
+            const speed = last ? Math.min(MAX_SPEED, dist * 2.2 + 0.25) : MAX_SPEED * 0.85;
             tmp.desired.copy(tmp.v).normalize().multiplyScalar(speed);
-            // застряли о мебель — обходим через середину комнаты
             if (dist > st.lastDist - 0.0015) st.stuck += dt;
             else st.stuck = Math.max(0, st.stuck - dt * 0.5);
             st.lastDist = Math.min(st.lastDist, dist);
-            if (st.stuck > 0.45) {
+            if (st.stuck > 0.8) {
+              // упёрлись — пересчитываем маршрут, а если не помогло, пропускаем шаг
               st.stuck = 0;
               st.lastDist = Infinity;
-              if (!st.detour) st.detour = true;
-              else {
-                st.detour = false;
-                heroCmd.shift(); // не дошли — не беда
-              }
+              if (++st.replans > 2) heroCmd.shift();
+              else st.path = findPath(st.pos, step.to, RADIUS);
             }
           }
         }
@@ -243,26 +238,15 @@ export function Character() {
       }
     }
 
-    // Ручное движение относительно камеры
-    if (manual && free) {
-      camera.getWorldDirection(tmp.fwd).setY(0).normalize();
-      tmp.right.set(-tmp.fwd.z, 0, tmp.fwd.x);
-      tmp.desired
-        .copy(tmp.fwd)
-        .multiplyScalar(control.input.y)
-        .addScaledVector(tmp.right, control.input.x)
-        .multiplyScalar(MAX_SPEED);
-    }
-
     // ---- Позы ----
     const sitTarget = control.pose === "sit" ? 1 : 0;
     const lieTarget = control.pose === "lie" ? 1 : 0;
     // встать из одной позы прежде, чем принять другую
-    if (sitTarget && st.lie > 0) st.lie = approach(st.lie, 0, dt / 1.1);
+    if (sitTarget && st.lie > 0) st.lie = approach(st.lie, 0, dt / 1.8);
     else if (lieTarget && st.sit > 0) st.sit = approach(st.sit, 0, dt / 0.9);
     else {
       st.sit = approach(st.sit, sitTarget, dt / 1.0);
-      st.lie = approach(st.lie, lieTarget, dt / 1.4);
+      st.lie = approach(st.lie, lieTarget, dt / 2.4);
     }
 
     // ---- Наушники ----
@@ -285,19 +269,35 @@ export function Character() {
     const moveAmt = Math.min(1, speed / MAX_SPEED);
     st.walk += dt * (4 + 8 * moveAmt) * Math.min(1, speed * 3);
 
-    // ---- Корень: сидя — к сиденью, лёжа — на кровать ----
+    // ---- Корень ----
+    // Кресло: пятимся к сиденью. Кровать: фаза A — садимся на край,
+    // фаза B — разворачиваемся и откидываемся на спину, поворачиваясь вокруг таза.
     const sitE = smoother(st.sit);
-    const lieE = smoother(st.lie);
+    const lieA = smoother(clamp01(st.lie / 0.5));
+    const lieB = smoother(clamp01((st.lie - 0.5) / 0.5));
+    const lieE = lieB;
     const r = root.current!;
-    let px = st.pos.x, pz = st.pos.z, py = 0;
-    px = THREE.MathUtils.lerp(px, SPOTS.chairSeat.x, sitE);
-    pz = THREE.MathUtils.lerp(pz, SPOTS.chairSeat.z, sitE);
-    px = THREE.MathUtils.lerp(px, SPOTS.bedLie.x, lieE);
-    pz = THREE.MathUtils.lerp(pz, SPOTS.bedLie.z, lieE);
-    py = SPOTS.bedLie.y * lieE + Math.sin(st.lie * Math.PI) * 0.28; // «запрыгивает» на кровать
-    r.position.set(px, py, pz);
-    r.rotation.y = st.rot + angleTo(st.rot, 0) * lieE;
-    poseG.current!.rotation.x = (-Math.PI / 2) * lieE;
+    const yaw = st.rot + angleTo(st.rot, 0) * lieB;
+    const tilt = LIE_TILT * lieB;
+    const chairLift = sitE * SIT_LIFT;
+    // где должен быть таз
+    tmp.v.set(st.pos.x, HIP_Y, st.pos.z);
+    tmp.v.x = THREE.MathUtils.lerp(tmp.v.x, SPOTS.chairSeat.x, sitE);
+    tmp.v.z = THREE.MathUtils.lerp(tmp.v.z, SPOTS.chairSeat.z, sitE);
+    tmp.v.y += chairLift;
+    if (st.lie > 0) {
+      tmp.v.lerp(BED_EDGE, lieA);
+      tmp.v.lerp(BED_HIP, lieB);
+    }
+    // корень = таз минус повёрнутое смещение таза
+    const hipH = HIP_Y + chairLift;
+    const oy = hipH * Math.cos(tilt), oz = hipH * Math.sin(tilt);
+    r.position.set(tmp.v.x - oz * Math.sin(yaw), tmp.v.y - oy, tmp.v.z - oz * Math.cos(yaw));
+    r.rotation.y = yaw;
+    poseG.current!.rotation.x = tilt;
+    const px = tmp.v.x, pz = tmp.v.z;
+    // ноги согнуты, когда сидим в кресле или на краю кровати
+    const legBend = Math.max(sitE, lieA * (1 - lieB));
 
     // ---- Сценарий музыки ----
     const listening = phase === "listening" && st.onHead > 0.98;
@@ -317,13 +317,15 @@ export function Character() {
     st.settle = damp(st.settle, listening ? 1 : 0, 1.5, dt);
     const groove = Math.sin(t * beat) * (0.05 + live.level * 0.14) * st.settle;
 
-    body.current!.position.y = sitE * SIT_LIFT + Math.abs(Math.sin(st.walk)) * 0.05 * moveAmt + breathe * (1 - lieE);
+    body.current!.position.y = chairLift + Math.abs(Math.sin(st.walk)) * 0.05 * moveAmt + breathe * (1 - lieE);
     body.current!.rotation.z = groove * 0.35 * (1 - lieE);
-    const dangle = Math.sin(t * beat * 0.5) * 0.25 * st.settle * sitE;
-    thighL.current!.rotation.x = swing * (1 - sitE) - (Math.PI / 2) * sitE;
-    thighR.current!.rotation.x = -swing * (1 - sitE) - (Math.PI / 2) * sitE;
-    shinL.current!.rotation.x = Math.max(0, -Math.sin(st.walk)) * 0.8 * moveAmt * (1 - sitE) + (Math.PI / 2 - 0.25 + dangle) * sitE + groove * 0.6 * lieE;
-    shinR.current!.rotation.x = Math.max(0, Math.sin(st.walk)) * 0.8 * moveAmt * (1 - sitE) + (Math.PI / 2 - 0.25 - dangle) * sitE - groove * 0.6 * lieE;
+    const dangle = Math.sin(t * beat * 0.5) * 0.25 * st.settle * legBend;
+    // лёжа одна нога чуть согнута — поза отдыха
+    const restKnee = 0.35 * lieB;
+    thighL.current!.rotation.x = swing * (1 - legBend) - (Math.PI / 2) * legBend - restKnee * 0.5;
+    thighR.current!.rotation.x = -swing * (1 - legBend) - (Math.PI / 2) * legBend;
+    shinL.current!.rotation.x = Math.max(0, -Math.sin(st.walk)) * 0.8 * moveAmt * (1 - legBend) + (Math.PI / 2 - 0.25 + dangle) * legBend + restKnee + groove * 0.6 * lieE;
+    shinR.current!.rotation.x = Math.max(0, Math.sin(st.walk)) * 0.8 * moveAmt * (1 - legBend) + (Math.PI / 2 - 0.25 - dangle) * legBend - groove * 0.6 * lieE;
 
     // Руки: тянутся к столику/голове во время переноса наушников,
     // а во время музыки (если стоим на месте) придерживают наушники
@@ -332,16 +334,19 @@ export function Character() {
     const reaching = Math.max(reachCarry * 0.7, reachHead);
     st.hold = damp(st.hold, listening && speed < 0.2 ? 1 : 0, 3, dt);
     const h = st.hold * (1 - reaching);
-    const armRest = -0.35 * sitE;
     const freeArm = 1 - Math.max(reaching, h);
-    armL.current!.rotation.x = (-swing * 0.9 + armRest) * freeArm - reaching * 2.75 - h * 0.25;
-    armR.current!.rotation.x = (swing * 0.9 + armRest) * freeArm - reaching * 2.75 - h * 0.25;
-    armL.current!.rotation.z = -0.25 - reaching * 0.2 - h * 1.65 + groove * 0.4;
-    armR.current!.rotation.z = 0.25 + reaching * 0.2 + h * 1.65 + groove * 0.4;
-    foreL.current!.rotation.x = -reaching * 0.9;
-    foreR.current!.rotation.x = -reaching * 0.9;
-    foreL.current!.rotation.z = -h * 1.6;
-    foreR.current!.rotation.z = h * 1.6;
+    // в кресле локти лежат на подлокотниках, предплечья вперёд
+    const elbow = sitE * freeArm;
+    // на кровати руки вдоль тела, ладони на животе
+    const rest = lieB * freeArm;
+    armL.current!.rotation.x = -swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5;
+    armR.current!.rotation.x = swing * 0.9 * freeArm * (1 - sitE) - reaching * 2.75 - h * 0.25 + elbow * 0.12 - rest * 0.5;
+    armL.current!.rotation.z = -0.25 - reaching * 0.2 - h * 1.65 - elbow * 0.6 + rest * 0.1 + groove * 0.4;
+    armR.current!.rotation.z = 0.25 + reaching * 0.2 + h * 1.65 + elbow * 0.6 - rest * 0.1 + groove * 0.4;
+    foreL.current!.rotation.x = -reaching * 0.9 - elbow * 1.35 - rest * 1.2;
+    foreR.current!.rotation.x = -reaching * 0.9 - elbow * 1.35 - rest * 1.2;
+    foreL.current!.rotation.z = -h * 1.6 + elbow * 0.45 + rest * 0.6;
+    foreR.current!.rotation.z = h * 1.6 - elbow * 0.45 - rest * 0.6;
 
     head.current!.rotation.x = groove * 1.1 - 0.06 * st.settle - 0.25 * lieE;
     head.current!.rotation.z = groove * 0.7;
@@ -402,7 +407,8 @@ export function Character() {
       <group ref={root} position={SPOTS.home.toArray()}>
         <group ref={poseG}>
         <group ref={body}>
-          <object3D ref={neckAnchor} position={[0, 0.98, 0.04]} rotation-x={1.25} />
+          {/* снятые наушники висят на шее дужкой назад, за головой */}
+          <object3D ref={neckAnchor} position={[0, 0.99, -0.07]} rotation-x={-1.15} />
           {/* ноги */}
           {([[thighL, shinL, -0.11], [thighR, shinR, 0.11]] as const).map(([thigh, shin, x], i) => (
             <group key={i} ref={thigh} position={[x, HIP_Y, 0]}>

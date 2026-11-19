@@ -1,4 +1,4 @@
-// Управление персонажем: ввод (клавиатура, джойстик, клик по полу)
+// Управление персонажем: клик или тап по полу и мебели, кнопки действий
 // и очередь действий (дойти, сесть, лечь, взять/надеть/снять наушники).
 
 import * as THREE from "three";
@@ -28,7 +28,7 @@ export const SPOTS = {
 
 export const FACE = {
   chair: CHAIR.rot,
-  bed: -Math.PI / 2,
+  bed: Math.PI / 2, // спиной к кровати: сначала садимся на край
   table: Math.atan2(SIDE_TABLE.x - SPOTS.tableFront.x, SIDE_TABLE.z - SPOTS.tableFront.z),
 };
 
@@ -41,15 +41,11 @@ interface HeroUI {
 export const useHeroUI = create<HeroUI>(() => ({ pose: "stand", hp: "table", busy: false }));
 
 export const control = {
-  /** Ввод направления: x — вправо, y — вперёд (относительно камеры), длина 0..1 */
-  input: new THREE.Vector2(),
-  keys: new THREE.Vector2(),
-  stick: new THREE.Vector2(),
   queue: [] as Step[],
   /** Желаемая поза и положение наушников (то, к чему стремится персонаж) */
   pose: "stand" as Pose,
   hp: "table" as HpLoc,
-  /** Вызывается, когда ручной ввод прервал подготовку к прослушиванию */
+  /** Вызывается, когда новая команда прервала подготовку к прослушиванию */
   onInterrupt: null as null | (() => void),
 };
 
@@ -58,6 +54,8 @@ function standFirst(): Step[] {
 }
 
 function setQueue(steps: Step[]) {
+  // новая команда во время подготовки к музыке отменяет прослушивание
+  if (control.queue.some((s) => s.k === "do") && !steps.some((s) => s.k === "do")) control.onInterrupt?.();
   control.queue = steps;
   useHeroUI.setState({ busy: steps.length > 0 });
 }
@@ -121,7 +119,7 @@ export const heroCmd = {
       // классический сценарий из плана: идём в кресло, садимся
       if (control.pose !== "lie") steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
       else steps.push({ k: "goto", to: SPOTS.bedSide, face: FACE.bed }, { k: "pose", to: "lie" });
-    } else if (control.pose === "stand" && control.input.lengthSq() === 0) {
+    } else if (control.pose === "stand") {
       steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
     }
     steps.push({ k: "hp", to: "head" }, { k: "do", fn: onReady });
@@ -136,39 +134,3 @@ export const heroCmd = {
     return s;
   },
 };
-
-// Клавиатура: WASD и стрелки
-const pressed = new Set<string>();
-function updateKeys() {
-  const x = (pressed.has("d") || pressed.has("arrowright") ? 1 : 0) - (pressed.has("a") || pressed.has("arrowleft") ? 1 : 0);
-  const y = (pressed.has("w") || pressed.has("arrowup") ? 1 : 0) - (pressed.has("s") || pressed.has("arrowdown") ? 1 : 0);
-  control.keys.set(x, y);
-  if (control.keys.lengthSq() > 1) control.keys.normalize();
-}
-const KEYMAP: Record<string, string> = { ц: "w", ф: "a", ы: "s", в: "d" }; // русская раскладка
-
-if (typeof window !== "undefined") {
-  window.addEventListener("keydown", (e) => {
-    const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-    let k = e.key.toLowerCase();
-    k = KEYMAP[k] ?? k;
-    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
-      // стрелки влево/вправо в открытом альбоме листают страницы
-      if (document.querySelector(".album") && k.startsWith("arrow")) return;
-      pressed.add(k);
-      updateKeys();
-      e.preventDefault();
-    }
-  });
-  window.addEventListener("keyup", (e) => {
-    let k = e.key.toLowerCase();
-    k = KEYMAP[k] ?? k;
-    pressed.delete(k);
-    updateKeys();
-  });
-  window.addEventListener("blur", () => {
-    pressed.clear();
-    updateKeys();
-  });
-}
