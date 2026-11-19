@@ -5,7 +5,8 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, Vignette } from "@react-three/postprocessing";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useQualitySettings } from "./quality";
 import * as THREE from "three";
 import { audio } from "../audio/engine";
 import { useStore } from "../store";
@@ -31,7 +32,25 @@ export function AtmosphereRig() {
   const vignette = useRef<VignetteEffectLike>(null);
   const bc = useRef<BCEffectLike>(null);
   const hs = useRef<HSEffectLike>(null);
-  const { scene } = useThree();
+  const { scene, gl } = useThree();
+  const q = useQualitySettings();
+  // смена размера карты теней: старую карту нужно выбросить, она пересоздастся
+  useEffect(() => {
+    const k = key.current;
+    if (!k) return;
+    k.shadow.mapSize.set(q.shadowSize, q.shadowSize);
+    k.shadow.map?.dispose();
+    (k.shadow as { map: THREE.WebGLRenderTarget | null }).map = null;
+  }, [q.shadowSize]);
+  // тени перерисовываются не каждый кадр на среднем и низком качестве
+  const shadowTick = useRef(0);
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => {
+      gl.shadowMap.autoUpdate = true;
+    };
+  }, [gl]);
 
   const fog = useMemo(() => new THREE.FogExp2("#9cc6e8", 0.01), []);
   const bg = useMemo(() => new THREE.Color("#1b1d26"), []);
@@ -98,6 +117,8 @@ export function AtmosphereRig() {
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
+    shadowTick.current++;
+    if (q.level === "high" || shadowTick.current % 2 === 0) gl.shadowMap.needsUpdate = true;
     const { target, preview, phase } = useStore.getState();
     // Во время перелистывания альбома даём «намёк» на атмосферу страницы.
     // без воспоминания атмосферу задаёт время суток на часах
@@ -196,7 +217,7 @@ export function AtmosphereRig() {
       <directionalLight
         ref={key}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[q.shadowSize, q.shadowSize]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-camera-left={-7}
@@ -261,10 +282,10 @@ export function AtmosphereRig() {
         <Lightformer form="rect" intensity={0.6} color="#cfdcff" position={[8, 2, 4]} rotation-y={-Math.PI / 2} scale={[8, 4, 1]} />
         <Lightformer form="rect" intensity={0.35} color="#b98d63" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
       </Environment>
-      <EffectComposer multisampling={4} enableNormalPass={false}>
-        {/* затенение в углах и под предметами */}
-        <N8AO halfRes quality="medium" aoRadius={0.45} distanceFalloff={0.6} intensity={2.2} color="#2a1c12" />
-        <Bloom ref={bloom as never} intensity={0.4} luminanceThreshold={0.62} luminanceSmoothing={0.3} mipmapBlur />
+      <EffectComposer key={q.level} multisampling={q.msaa} enableNormalPass={false}>
+        {/* затенение в углах и под предметами (на низком качестве выключено) */}
+        <>{q.ao && <N8AO halfRes quality={q.aoQuality} aoRadius={0.45} distanceFalloff={0.6} intensity={2.2} color="#2a1c12" />}</>
+        <>{q.bloom && <Bloom ref={bloom as never} intensity={0.4} luminanceThreshold={0.62} luminanceSmoothing={0.3} mipmapBlur />}</>
         <HueSaturation ref={hs as never} saturation={0} />
         <BrightnessContrast ref={bc as never} contrast={0} brightness={0} />
         <Vignette ref={vignette as never} offset={0.28} darkness={0.5} />

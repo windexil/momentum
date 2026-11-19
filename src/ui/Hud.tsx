@@ -1,3 +1,4 @@
+import { useQuality, type QualityLevel, type QualityMode } from "../scene/quality";
 import { useEffect, useState } from "react";
 import { checkAi } from "../atmosphere/analyze";
 import { useStore } from "../store";
@@ -44,6 +45,7 @@ export function Hud() {
           {ai === null ? "…" : ai ? "AI: Claude" : "AI: локальный анализ"}
         </div>
         <TimeChip />
+        <QualityChip />
       </header>
 
       {phase === "idle" && panel === "none" && (
@@ -92,6 +94,23 @@ export function Hud() {
 }
 
 /** Время в комнате (как на настенных часах); клик — на час вперёд. */
+const Q_NEXT: Record<QualityMode, QualityMode> = { auto: "high", high: "medium", medium: "low", low: "auto" };
+const Q_RU: Record<QualityMode | QualityLevel, string> = { auto: "авто", high: "высокая", medium: "средняя", low: "низкая" };
+
+function QualityChip() {
+  const mode = useQuality((s) => s.mode);
+  const auto = useQuality((s) => s.autoLevel);
+  return (
+    <button
+      className="ai-badge time-chip"
+      title="Качество графики. «Авто» само снижает нагрузку, если комната начинает тормозить"
+      onClick={() => useQuality.getState().setMode(Q_NEXT[mode])}
+    >
+      ⚙ Графика: {mode === "auto" ? `авто (${Q_RU[auto]})` : Q_RU[mode]}
+    </button>
+  );
+}
+
 function TimeChip() {
   const [h, setH] = useState(gameClock.hours);
   useEffect(() => {

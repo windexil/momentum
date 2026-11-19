@@ -5,7 +5,8 @@
 
 import { useFrame } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { mergeStatic } from "./staticMerge";
 import * as THREE from "three";
 import { live } from "./live";
 import { props } from "./sceneState";
@@ -87,8 +88,12 @@ export function Room() {
     mats.wall2.color.copy(base.wall2).lerp(p[0], 0.18);
   });
 
+  // неподвижные детали склеиваются в несколько больших мешей
+  const root = useRef<THREE.Group>(null);
+  useLayoutEffect(() => mergeStatic(root.current!), []);
+
   return (
-    <group>
+    <group ref={root}>
       <Floor mats={mats} />
       <Walls mats={mats} />
       <Bed mats={mats} />
@@ -413,7 +418,7 @@ function DeskChair({ mats }: { mats: Mats }) {
   });
   return (
     <group>
-      <group ref={ref} position={[-0.1, 0, 0.75]}>
+      <group ref={ref} position={[-0.1, 0, 0.75]} userData={{ dynamic: true }}>
         <mesh position={[0, 0.46, 0]} castShadow material={mats.wood}>
           <boxGeometry args={[0.5, 0.06, 0.5]} />
         </mesh>
@@ -701,6 +706,7 @@ function WallClock({ position, mats }: { position: [number, number, number]; mat
   return (
     <group
       position={position}
+      userData={{ dynamic: true }}
       onClick={(e) => {
         e.stopPropagation();
         advanceClock(1);
@@ -783,7 +789,7 @@ function Plant({ position, mats, scale = 1 }: { position: [number, number, numbe
       <mesh position={[0, 0.485, 0]} rotation-x={-Math.PI / 2} material={mats.soil}>
         <circleGeometry args={[0.26, 24]} />
       </mesh>
-      <group ref={ref} position={[0, 0.49, 0]}>
+      <group ref={ref} position={[0, 0.49, 0]} userData={{ dynamic: true }}>
         {leaves.map((l, i) => (
           <group key={i} rotation={[0, l.rot, 0]}>
             <group position={[0, 0, l.base]} rotation-x={l.tilt}>

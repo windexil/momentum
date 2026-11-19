@@ -1,6 +1,7 @@
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import { Suspense } from "react";
+import { OrbitControls, PerformanceMonitor } from "@react-three/drei";
+import { Suspense, useEffect } from "react";
+import { useQuality, useQualitySettings } from "./quality";
 import * as THREE from "three";
 import { Album3D } from "./Album3D";
 import { AtmosphereRig } from "./AtmosphereRig";
@@ -15,10 +16,11 @@ export function Scene() {
   return (
     <Canvas
       shadows
-      dpr={[1, 1.75]}
+      dpr={1}
       camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
     >
+      <QualityRig />
       <Suspense fallback={null}>
         <AtmosphereRig />
         <Room />
@@ -53,4 +55,23 @@ function DevHandle() {
   const state = useThree();
   (window as unknown as { __three: unknown }).__three = state;
   return null;
+}
+
+/** Подстраивает размер кадра под качество и следит за FPS в режиме «авто». */
+function QualityRig() {
+  const { dpr } = useQualitySettings();
+  const setDpr = useThree((s) => s.setDpr);
+  useEffect(() => {
+    setDpr(Math.min(window.devicePixelRatio || 1, dpr));
+  }, [dpr, setDpr]);
+  const q = useQuality.getState;
+  return (
+    <PerformanceMonitor
+      bounds={() => [40, 58]}
+      flipflops={4}
+      onDecline={() => q().decline()}
+      onIncline={() => q().incline()}
+      onFallback={() => useQuality.setState({ autoLevel: "low" })}
+    />
+  );
 }
