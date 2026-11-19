@@ -401,3 +401,27 @@ button:disabled { opacity: 0.45; cursor: default; }
 .album.on-desk .page-left { border-radius: 4px 0 0 4px; }
 .album.on-desk .page-right { border-radius: 0 4px 4px 0; }
 .album.on-desk .page { box-shadow: inset 0 0 18px rgba(40,22,8,.35); }
+
+/* меню настольной лампы */
+.lamp-menu {
+  width: 232px; padding: 12px 12px 10px; border-radius: 16px;
+  background: rgba(28, 24, 22, 0.82); backdrop-filter: blur(10px);
+  color: #f5ece0; font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  transform: translateY(-60%); user-select: none;
+}
+.lamp-menu-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.lamp-tones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lamp-tone {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 0; border-radius: 10px;
+}
+.lamp-tone:hover { background: rgba(255,255,255,.08); }
+.lamp-tone .sw { width: 24px; height: 24px; border-radius: 50%; box-shadow: 0 0 10px currentColor, inset 0 0 0 2px rgba(255,255,255,.25); }
+.lamp-tone .sw.auto { background-image: conic-gradient(#ff9a4a, #ffa6c4, #bcd6ff, #a8f0cf, #ff9a4a) !important; }
+.lamp-tone.active .sw { box-shadow: 0 0 0 2px #fff, 0 0 14px rgba(255,230,180,.8); }
+.lamp-tone .nm { font-size: 10px; opacity: .85; }
+.lamp-power {
+  width: 100%; margin-top: 8px; padding: 7px 0; border-radius: 10px; border: 0; cursor: pointer;
+  background: rgba(255,255,255,.12); color: inherit; font-weight: 700;
+}
+.lamp-power.on { background: #f3c77a; color: #2a1e12; }

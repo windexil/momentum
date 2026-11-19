@@ -161,6 +161,8 @@ export function CameraFollow() {
   const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
 
   useFrame((_, rawDt) => {
+    // только для отладки: свободная камера без слежения за персонажем
+    if (import.meta.env.DEV && (window as unknown as { __noFollow?: boolean }).__noFollow) return;
     if (!controls) return;
     const dt = Math.min(rawDt, 0.05);
     const cam = camera as THREE.PerspectiveCamera;

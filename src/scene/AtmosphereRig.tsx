@@ -13,6 +13,8 @@ import { NEUTRAL_ATMOSPHERE } from "../atmosphere/types";
 import { DESK, FLOOR_LAMP, ROOM, WINDOW } from "./Room";
 import { stepClock, timeOfDayAtmosphere } from "./dayTime";
 import { props } from "./sceneState";
+import { useRoom } from "../roomStore";
+import { DeskLampControl, deskLampColor } from "./DeskLamp";
 import { live, stepLive } from "./live";
 
 type EffectWithIntensity = { intensity: number };
@@ -90,7 +92,7 @@ export function AtmosphereRig() {
   );
   const floorShade = useMemo(() => lampShade.clone(), [lampShade]);
   const cord = useRef<THREE.Group>(null);
-  const st = useMemo(() => ({ floorOn: 1 }), []);
+  const st = useMemo(() => ({ floorOn: 1, deskOn: 1, deskColor: new THREE.Color("#ffd9a0") }), []);
   const tmp = useMemo(() => new THREE.Color(), []);
 
   useFrame(({ clock }, rawDt) => {
@@ -127,14 +129,18 @@ export function AtmosphereRig() {
     h.groundColor.copy(live.palette[4]).lerp(tmp.set("#3a2a20"), 0.5);
     h.intensity = live.ambientIntensity * 1.6;
 
-    lamp.current!.color.copy(live.lampColor);
-    lamp.current!.intensity = (1.2 + live.night * 4) * pulse * (1 + Math.sin(t * 7) * 0.01);
+    // настольная лампа: тон и выключатель из меню у лампы
+    st.deskOn += ((useRoom.getState().deskLamp.on ? 1 : 0) - st.deskOn) * (1 - Math.exp(-8 * dt));
+    deskLampColor(tmp);
+    st.deskColor.lerp(tmp, 1 - Math.exp(-6 * dt));
+    lamp.current!.color.copy(st.deskColor);
+    lamp.current!.intensity = (1.2 + live.night * 4) * pulse * (1 + Math.sin(t * 7) * 0.01) * st.deskOn;
     // торшер плавно гаснет и зажигается шнурком
     st.floorOn += ((props.lampOn ? 1 : 0) - st.floorOn) * (1 - Math.exp(-6 * dt));
     floorLamp.current!.color.copy(live.lampColor);
     floorLamp.current!.intensity = (0.6 + live.night * 3.5) * pulse * st.floorOn;
-    lampShade.emissive.copy(live.lampColor);
-    lampShade.emissiveIntensity = 0.6 + live.night * 1.4 + live.level * 0.8;
+    lampShade.emissive.copy(st.deskColor);
+    lampShade.emissiveIntensity = (0.6 + live.night * 1.4 + live.level * 0.8) * st.deskOn + 0.03;
     floorShade.emissive.copy(live.lampColor);
     floorShade.emissiveIntensity = (0.6 + live.night * 1.4 + live.level * 0.8) * st.floorOn + 0.03;
     // шнурок: оттягивается вниз, когда персонаж за него тянет
@@ -214,6 +220,7 @@ export function AtmosphereRig() {
           <cylinderGeometry args={[0.1, 0.17, 0.18, 20, 1, true]} />
         </mesh>
         <pointLight ref={lamp} position={[0, 0.35, 0]} distance={5} decay={1.6} castShadow={false} />
+        <DeskLampControl />
       </group>
       <pointLight ref={floorLamp} position={[FLOOR_LAMP.x, 1.55, FLOOR_LAMP.z]} distance={5} decay={1.6} />
       <group position={[FLOOR_LAMP.x, 1.65, FLOOR_LAMP.z]}>
