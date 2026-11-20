@@ -8,6 +8,7 @@
 import { clamp, lerp } from "../util";
 import { hexToRgb, hsl, mixHex, rgbToHsl, tint } from "./color";
 import type { AnalyzeInput, Atmosphere, ParticleType } from "./types";
+import { MOODS, type MoodId } from "./moods";
 
 interface Theme {
   id: string;
@@ -21,26 +22,42 @@ interface Theme {
   particle?: ParticleType;
   /** Погода и время суток физически видны в комнате, поэтому весят больше. */
   weather?: boolean;
+  /** К какому настроению (палитре) относится тема */
+  mood: MoodId | null;
 }
 
 const THEMES: Theme[] = [
-  { id: "summer", label: "лето", words: ["лет", "солнц", "жар", "пляж", "море", "морск", "загар", "каникул", "summer", "sun", "beach", "sea"], valence: 0.8, energy: 0.7, warmth: 0.9, hue: 38, particle: "sparks", weather: true },
-  { id: "sunset", label: "закат", words: ["закат", "рассвет", "вечер", "золот", "sunset", "dawn", "golden"], valence: 0.5, energy: 0.35, warmth: 0.8, hue: 20, particle: "dust" },
-  { id: "rain", label: "дождь", words: ["дожд", "ливен", "лужи", "лужа", "зонт", "гроз", "сыро", "rain", "storm"], valence: -0.2, energy: 0.3, warmth: -0.5, hue: 215, particle: "rain", weather: true },
-  { id: "winter", label: "зима", words: ["зим", "снег", "снеж", "мороз", "новый год", "новогод", "ёлк", "елк", "лёд", "лед", "winter", "snow", "christmas"], valence: 0.4, energy: 0.35, warmth: -0.6, hue: 205, particle: "snow", weather: true },
-  { id: "night", label: "ночь", words: ["ноч", "звёзд", "звезд", "луна", "лунн", "темн", "полноч", "night", "stars", "moon"], valence: 0.1, energy: 0.25, warmth: -0.3, night: true, hue: 240, particle: "stars", weather: true },
-  { id: "spring", label: "весна", words: ["весн", "цвет", "сакур", "сирен", "сад", "май", "spring", "bloom", "flower"], valence: 0.7, energy: 0.5, warmth: 0.3, hue: 330, particle: "petals" },
-  { id: "love", label: "любовь", words: ["любл", "любов", "свидан", "поцел", "обним", "сердц", "нежн", "love", "kiss", "date"], valence: 0.8, energy: 0.45, warmth: 0.6, hue: 345, particle: "petals" },
-  { id: "party", label: "праздник", words: ["праздн", "вечерин", "концерт", "танц", "день рожд", "др ", "фестив", "салют", "клуб", "party", "concert", "dance", "birthday"], valence: 0.9, energy: 0.95, warmth: 0.4, hue: 290, particle: "sparks" },
-  { id: "forest", label: "природа", words: ["лес", "поход", "палатк", "костёр", "костер", "горы", "гора", "озер", "река", "трав", "forest", "camp", "mountain", "lake"], valence: 0.6, energy: 0.45, warmth: 0.3, hue: 120, particle: "fireflies" },
-  { id: "water", label: "вода", words: ["плав", "волн", "бассейн", "океан", "нырн", "swim", "ocean", "wave"], valence: 0.6, energy: 0.55, warmth: 0, hue: 190, particle: "bubbles" },
-  { id: "sad", label: "грусть", words: ["груст", "печал", "скуча", "одинок", "плак", "прощ", "потер", "расстал", "тоск", "sad", "lonely", "miss", "cry"], valence: -0.8, energy: 0.2, warmth: -0.4, hue: 225, particle: "rain" },
-  { id: "nostalgia", label: "ностальгия", words: ["детств", "бабушк", "дедушк", "помню", "вспомин", "старый", "давно", "школ", "дача", "дачу", "childhood", "remember", "old"], valence: 0.35, energy: 0.25, warmth: 0.7, hue: 32, particle: "dust" },
-  { id: "calm", label: "спокойствие", words: ["тих", "спокой", "уют", "чай", "книг", "плед", "отдых", "медлен", "calm", "quiet", "cozy", "tea"], valence: 0.45, energy: 0.15, warmth: 0.5, hue: 30, particle: "dust" },
-  { id: "joy", label: "радость", words: ["счаст", "радост", "весел", "смея", "смех", "ура", "восторг", "лучший", "happy", "joy", "fun", "best"], valence: 0.9, energy: 0.75, warmth: 0.5, hue: 48, particle: "fireflies" },
-  { id: "city", label: "город", words: ["город", "улиц", "метро", "огни", "неон", "крыш", "city", "street", "neon"], valence: 0.3, energy: 0.6, warmth: -0.1, night: true, hue: 270, particle: "sparks" },
-  { id: "anxiety", label: "тревога", words: ["страх", "страш", "тревог", "волн", "экзам", "стресс", "fear", "stress", "exam"], valence: -0.5, energy: 0.65, warmth: -0.3, hue: 260, particle: "dust" },
+  { id: "summer", label: "лето", words: ["лет", "солнц", "жар", "пляж", "море", "морск", "загар", "каникул", "summer", "sun", "beach", "sea"], valence: 0.8, energy: 0.7, warmth: 0.9, hue: 38, particle: "sparks", weather: true, mood: "joy" },
+  { id: "sunset", label: "закат", words: ["закат", "рассвет", "вечер", "золот", "sunset", "dawn", "golden"], valence: 0.5, energy: 0.35, warmth: 0.8, hue: 20, particle: "dust", mood: "cozy" },
+  { id: "rain", label: "дождь", words: ["дожд", "ливен", "лужи", "лужа", "зонт", "гроз", "сыро", "rain", "storm"], valence: -0.2, energy: 0.3, warmth: -0.5, hue: 215, particle: "rain", weather: true, mood: "sadness" },
+  { id: "winter", label: "зима", words: ["зим", "снег", "снеж", "мороз", "новый год", "новогод", "ёлк", "елк", "лёд", "лед", "winter", "snow", "christmas"], valence: 0.4, energy: 0.35, warmth: -0.6, hue: 205, particle: "snow", weather: true, mood: "calm" },
+  { id: "night", label: "ночь", words: ["ноч", "звёзд", "звезд", "луна", "лунн", "темн", "полноч", "night", "stars", "moon"], valence: 0.1, energy: 0.25, warmth: -0.3, night: true, hue: 240, particle: "stars", weather: true, mood: null },
+  { id: "spring", label: "весна", words: ["весн", "цвет", "сакур", "сирен", "сад", "май", "spring", "bloom", "flower"], valence: 0.7, energy: 0.5, warmth: 0.3, hue: 330, particle: "petals", mood: "romance" },
+  { id: "love", label: "любовь", words: ["любл", "любов", "свидан", "поцел", "обним", "сердц", "нежн", "love", "kiss", "date"], valence: 0.8, energy: 0.45, warmth: 0.6, hue: 345, particle: "petals", mood: "romance" },
+  { id: "party", label: "праздник", words: ["праздн", "вечерин", "концерт", "танц", "день рожд", "др ", "фестив", "салют", "клуб", "party", "concert", "dance", "birthday"], valence: 0.9, energy: 0.95, warmth: 0.4, hue: 290, particle: "sparks", mood: "joy" },
+  { id: "forest", label: "природа", words: ["лес", "поход", "палатк", "костёр", "костер", "горы", "гора", "озер", "река", "трав", "forest", "camp", "mountain", "lake"], valence: 0.6, energy: 0.45, warmth: 0.3, hue: 120, particle: "fireflies", mood: "nature" },
+  { id: "water", label: "вода", words: ["плав", "волн", "бассейн", "океан", "нырн", "swim", "ocean", "wave"], valence: 0.6, energy: 0.55, warmth: 0, hue: 190, particle: "bubbles", mood: "calm" },
+  { id: "sad", label: "грусть", words: ["груст", "печал", "скуча", "одинок", "плак", "прощ", "потер", "расстал", "тоск", "sad", "lonely", "miss", "cry"], valence: -0.8, energy: 0.2, warmth: -0.4, hue: 225, particle: "rain", mood: "sadness" },
+  { id: "nostalgia", label: "ностальгия", words: ["детств", "бабушк", "дедушк", "помню", "вспомин", "старый", "давно", "школ", "дача", "дачу", "childhood", "remember", "old"], valence: 0.35, energy: 0.25, warmth: 0.7, hue: 32, particle: "dust", mood: "nostalgia" },
+  { id: "calm", label: "спокойствие", words: ["тих", "спокой", "умиротвор", "безмятеж", "медлен", "отдых", "calm", "quiet", "peace"], valence: 0.45, energy: 0.15, warmth: 0.5, hue: 30, particle: "dust", mood: "calm" },
+  { id: "joy", label: "радость", words: ["счаст", "радост", "весел", "смея", "смех", "ура", "восторг", "лучший", "happy", "joy", "fun", "best"], valence: 0.9, energy: 0.75, warmth: 0.5, hue: 48, particle: "fireflies", mood: "joy" },
+  { id: "city", label: "город", words: ["город", "улиц", "метро", "огни", "неон", "крыш", "city", "street", "neon"], valence: 0.3, energy: 0.6, warmth: -0.1, night: true, hue: 270, particle: "sparks", mood: "drama" },
+  { id: "anxiety", label: "тревога", words: ["страх", "страш", "тревог", "волн", "экзам", "стресс", "fear", "stress", "exam"], valence: -0.5, energy: 0.65, warmth: -0.3, hue: 260, particle: "dust", mood: "drama" },
+  { id: "cozy", label: "уют", words: ["уют", "тепл", "плед", "чай", "какао", "камин", "свеч", "книг", "дом", "cozy", "warm", "tea"], valence: 0.6, energy: 0.2, warmth: 0.85, hue: 28, particle: "dust", mood: "cozy" },
+  { id: "anger", label: "злость", words: ["злю", "злост", "злой", "бесит", "ярост", "ненави", "орал", "кричал", "ссор", "взбес", "angry", "rage", "hate"], valence: -0.8, energy: 0.9, warmth: 0.2, hue: 358, particle: "sparks", mood: "anger" },
+  { id: "apathy", label: "хандра", words: ["хандр", "апати", "ничего не хоч", "устал", "усталост", "лень", "пусто", "серо", "скучн", "tired", "bored", "empty"], valence: -0.45, energy: 0.08, warmth: -0.2, hue: 40, particle: "dust", mood: "apathy" },
+  { id: "minimal", label: "строгость", words: ["работ", "офис", "учёб", "учеб", "порядок", "дедлайн", "отчёт", "отчет", "собеседов", "строг", "минимал", "work", "office", "deadline"], valence: 0.05, energy: 0.45, warmth: -0.3, hue: 215, particle: "dust", mood: "minimal" },
 ];
+
+/** Главное настроение: сумма очков тем по каждому настроению. */
+function pickMood(hits: { theme: Theme; score: number }[], valence: number): MoodId {
+  const sum = new Map<MoodId, number>();
+  // время суток («ночь») само по себе настроение не задаёт
+  for (const h of hits) if (h.theme.mood) sum.set(h.theme.mood, (sum.get(h.theme.mood) ?? 0) + h.score);
+  let best: MoodId | null = null, bestScore = 0;
+  for (const [m, v] of sum) if (v > bestScore) (best = m), (bestScore = v);
+  return best ?? (valence < 0 ? "nostalgia" : "calm");
+}
 
 function detectThemes(text: string) {
   const t = ` ${text.toLowerCase().replace(/ё/g, "е")} `;
@@ -119,17 +136,13 @@ export function analyzeLocally(input: AnalyzeInput): Atmosphere {
   const baseHue = circularMeanHue(hueSources) ?? (warmth > 0 ? 35 : 210);
 
   const sat = clamp(0.35 + Math.abs(valence) * 0.25 + photoSat * 0.3 + energy * 0.15, 0.25, 0.9);
-  const light = clamp(night ? 0.32 : 0.55 + valence * 0.1 + (photoLight - 0.5) * 0.2, 0.25, 0.75);
-  const spread = 18 + energy * 40;
-  const palette = [
-    hsl(baseHue, sat, clamp(light + 0.22, 0, 0.92)),
-    hsl(baseHue + spread, sat, light + 0.05),
-    hsl(baseHue - spread, sat * 0.9, light),
-    hsl(baseHue + 180 * (energy > 0.6 ? 1 : 0.25), sat * 0.7, light - 0.12),
-    hsl(baseHue, sat * 0.6, clamp(light - 0.3, 0.06, 1)),
-  ];
-  if (input.photoColors[0]) palette[1] = mixHex(palette[1], input.photoColors[0], 0.5);
-  if (input.photoColors[1]) palette[2] = mixHex(palette[2], input.photoColors[1], 0.5);
+  // Палитра — из главного настроения; фото лишь слегка сдвигают акценты.
+  void sat;
+  const moodId = pickMood(hits, valence);
+  const moodDef = MOODS[moodId];
+  const palette: string[] = moodDef.palette.map((c) => c.toLowerCase());
+  if (input.photoColors[0]) palette[1] = mixHex(palette[1], input.photoColors[0], 0.15);
+  if (input.photoColors[1]) palette[2] = mixHex(palette[2], input.photoColors[1], 0.15);
 
   // Частицы: самая сильная тема с частицами; иначе по энергии.
   const particleType: ParticleType =
@@ -150,7 +163,8 @@ export function analyzeLocally(input: AnalyzeInput): Atmosphere {
 
   const moodWords = hits.slice(0, 2).map((h) => h.theme.label);
   const tone = valence > 0.5 ? "светлое" : valence > 0 ? "спокойное" : valence > -0.4 ? "задумчивое" : "грустное";
-  const mood = moodWords.length ? `${tone}: ${moodWords.join(" и ")}` : `${tone} воспоминание`;
+  void tone;
+  const mood = moodWords.length ? `${moodDef.name.toLowerCase()}: ${moodWords.join(" и ")}` : moodDef.name.toLowerCase();
 
   return {
     mood,
