@@ -8,7 +8,9 @@ import { useStore } from "../store";
 import type { Memory } from "../types";
 import { formatDate } from "../util";
 
-const FLIP_MS = 650;
+const FLIP_MS = 950;
+const CLOSE_MS = 340;
+const COVER_MS = 750;
 
 export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   const memories = useStore((s) => s.memories);
@@ -21,6 +23,31 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   // сначала видна закрытая обложка с надписью, её можно изменить
   const [opened, setOpened] = useState(onDesk); // на столе обложку уже открыла 3D-книга
   const timer = useRef<number | null>(null);
+  // плавные состояния: обложка раскрывается, страницы разворачиваются, альбом закрывается
+  const [coverOpening, setCoverOpening] = useState(false);
+  const [unfold, setUnfold] = useState(onDesk);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (!unfold) return;
+    const t = window.setTimeout(() => setUnfold(false), 1100);
+    return () => window.clearTimeout(t);
+  }, [unfold]);
+
+  function close() {
+    if (closing) return;
+    if (onDesk) return setPanel("none");
+    setClosing(true);
+    window.setTimeout(() => setPanel("none"), CLOSE_MS);
+  }
+  function openCover() {
+    if (coverOpening) return;
+    setCoverOpening(true);
+    window.setTimeout(() => {
+      setOpened(true);
+      setUnfold(true);
+      setCoverOpening(false);
+    }, COVER_MS);
+  }
 
   const total = memories.length + 1; // последний разворот — «новая запись»
   const current = memories[index];
@@ -37,9 +64,9 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
-      if (e.key === "ArrowRight") opened ? go("next") : setOpened(true);
+      if (e.key === "ArrowRight") opened ? go("next") : openCover();
       if (e.key === "ArrowLeft") go("prev");
-      if (e.key === "Escape") setPanel("none");
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -78,19 +105,20 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   if (onDesk) {
     return (
       <div className="album vintage on-desk">
-        <div className="spread">
+        <div className={"spread" + (unfold ? " unfold" : "")}>
           <Page side="left">{baseLeft}</Page>
           <Page side="right">{baseRight}</Page>
+          {flip && <i className={`under-shade ${flip}`} />}
           {flip === "next" && (
             <div className="leaf leaf-right flipping-next">
-              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page></div>
-              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page></div>
+              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page><i className="leaf-shade" /></div>
+              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page><i className="leaf-shade" /></div>
             </div>
           )}
           {flip === "prev" && (
             <div className="leaf leaf-left flipping-prev">
-              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page></div>
-              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page></div>
+              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page><i className="leaf-shade" /></div>
+              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page><i className="leaf-shade" /></div>
             </div>
           )}
           <div className="spine" />
@@ -98,38 +126,39 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
           <button className="corner-turn left" disabled={index === 0 || !!flip} onClick={() => go("prev")} aria-label="Назад">‹</button>
           <button className="corner-turn right" disabled={index >= total - 1 || !!flip} onClick={() => go("next")} aria-label="Вперёд">›</button>
         </div>
-        <button className="close" aria-label="Закрыть альбом" onClick={() => setPanel("none")}>×</button>
+        <button className="close" aria-label="Закрыть альбом" onClick={close}>×</button>
       </div>
     );
   }
 
   if (!opened) {
     return (
-      <div className="album-wrap" onClick={() => setPanel("none")}>
-        <div className="album" onClick={(e) => e.stopPropagation()}>
-          <Cover onOpen={() => setOpened(true)} />
-          <button className="close" aria-label="Закрыть альбом" onClick={() => setPanel("none")}>×</button>
+      <div className={"album-wrap" + (closing ? " closing" : "")} onClick={close}>
+        <div className={"album" + (coverOpening ? " cover-opening" : "")} onClick={(e) => e.stopPropagation()}>
+          <Cover onOpen={openCover} />
+          <button className="close" aria-label="Закрыть альбом" onClick={close}>×</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="album-wrap" onClick={() => setPanel("none")}>
-      <div className="album vintage" onClick={(e) => e.stopPropagation()}>
-        <div className="spread">
+    <div className={"album-wrap" + (closing ? " closing" : "")} onClick={close}>
+      <div className={"album vintage" + (unfold ? " just-opened" : "")} onClick={(e) => e.stopPropagation()}>
+        <div className={"spread" + (unfold ? " unfold" : "")}>
           <Page side="left">{baseLeft}</Page>
           <Page side="right">{baseRight}</Page>
+          {flip && <i className={`under-shade ${flip}`} />}
           {flip === "next" && (
             <div className="leaf leaf-right flipping-next">
-              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page></div>
-              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page></div>
+              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page><i className="leaf-shade" /></div>
+              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page><i className="leaf-shade" /></div>
             </div>
           )}
           {flip === "prev" && (
             <div className="leaf leaf-left flipping-prev">
-              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page></div>
-              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page></div>
+              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page><i className="leaf-shade" /></div>
+              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page><i className="leaf-shade" /></div>
             </div>
           )}
           <div className="spine" />
@@ -141,7 +170,7 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
           <span className="page-count">{Math.min(index + 1, total)} / {total}</span>
           <button className="ghost" disabled={index >= total - 1 || !!flip} onClick={() => go("next")}>Вперёд →</button>
         </div>
-        <button className="close" aria-label="Закрыть альбом" onClick={() => setPanel("none")}>×</button>
+        <button className="close" aria-label="Закрыть альбом" onClick={close}>×</button>
       </div>
     </div>
   );

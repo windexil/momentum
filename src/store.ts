@@ -112,3 +112,4 @@ export const useStore = create<State>((set, get) => ({
     set({ memories: [...get().memories.filter((m) => !ids.has(m.id)), ...demos].sort((a, b) => a.date.localeCompare(b.date)) });
   },
 }));
+if (import.meta.env.DEV) (window as unknown as { __store: unknown }).__store = useStore;

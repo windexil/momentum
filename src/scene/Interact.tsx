@@ -156,7 +156,7 @@ export function CameraFollow() {
       window.removeEventListener("pointerup", up);
     };
   }, [gl]);
-  const zoom = useRef({ listening: false, goal: null as number | null, before: 0 });
+  const zoom = useRef({ listening: false, goal: null as number | null, before: 0, t: 0, push: false, fov: 0 });
   // вид от первого лица за столом
   const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
 
@@ -224,13 +224,32 @@ export function CameraFollow() {
     const dist = tmp.off.length();
     if (hero.listening !== z.listening) {
       z.listening = hero.listening;
+      z.t = 0;
       if (hero.listening) {
+        // вход в воспоминание: быстрый наезд ближе обычного, потом камера чуть отступает
         z.before = dist;
-        z.goal = Math.max(5.2, dist * 0.82);
-      } else z.goal = z.before || null;
+        z.fov = cam.fov;
+        z.goal = Math.max(3.6, dist * 0.6);
+        z.push = true;
+      } else {
+        z.goal = z.before || null;
+        z.push = false;
+      }
+    }
+    z.t += dt;
+    if (z.push && z.t > 1.9) {
+      z.push = false;
+      z.goal = Math.max(5.2, z.before * 0.82);
+    }
+    // лёгкий «долли-зум»: во время наезда поле зрения сужается, затем возвращается
+    if (z.fov) {
+      const want = z.push ? z.fov * 0.9 : z.fov;
+      cam.fov += (want - cam.fov) * (1 - Math.exp(-2 * dt));
+      cam.updateProjectionMatrix();
+      if (!z.push && Math.abs(cam.fov - z.fov) < 0.01) (cam.fov = z.fov), (z.fov = 0), cam.updateProjectionMatrix();
     }
     if (z.goal !== null) {
-      const nd = dist + (z.goal - dist) * (1 - Math.exp(-1.2 * dt));
+      const nd = dist + (z.goal - dist) * (1 - Math.exp(-(z.push ? 1.9 : 1.2) * dt));
       camera.position.copy(controls.target).addScaledVector(tmp.off.normalize(), nd);
       if (Math.abs(nd - z.goal) < 0.03) z.goal = null;
     }

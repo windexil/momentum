@@ -458,3 +458,269 @@ button:disabled { opacity: 0.45; cursor: default; }
 .link-preview small { color: var(--muted); }
 .rights { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin-top: 6px; cursor: pointer; }
 .rights input { margin-top: 2px; }
+
+/* ======================================================================
+   Плавная анимация дневника
+   ====================================================================== */
+/* появление: альбом «выплывает» из глубины, без резкого скачка */
+.album { animation: albumIn .7s cubic-bezier(.16,.84,.24,1) both; }
+@keyframes albumIn {
+  from { opacity: 0; transform: translateY(46px) scale(.92) rotateX(10deg); filter: blur(3px); }
+  60% { filter: blur(0); }
+}
+.album-wrap { animation: fade .45s ease both; perspective: 1800px; }
+/* закрытие: альбом опускается и тает */
+.album-wrap.closing { animation: fadeOut .34s ease both; }
+.album-wrap.closing .album { animation: albumOut .34s cubic-bezier(.5,0,.75,0) both; }
+@keyframes fadeOut { to { opacity: 0; } }
+@keyframes albumOut { to { opacity: 0; transform: translateY(30px) scale(.95); } }
+
+/* обложка раскрывается, как настоящая: поворот вокруг корешка слева */
+.album .cover { transform-origin: left center; transform-style: preserve-3d; transition: transform .2s; }
+.album.cover-opening .cover { animation: coverOpen .75s cubic-bezier(.55,.05,.3,1) forwards; }
+.album.cover-opening .cover-open { opacity: 0; transition: opacity .2s; }
+@keyframes coverOpen {
+  0% { transform: rotateY(0); }
+  25% { transform: rotateY(-14deg) translateZ(20px); }
+  100% { transform: rotateY(-105deg) translateZ(30px); opacity: 0; }
+}
+
+/* после обложки страницы разворачиваются от корешка */
+.spread.unfold .page-left { transform-origin: right center; animation: unfoldL .9s cubic-bezier(.2,.75,.25,1) both; }
+.spread.unfold .page-right { transform-origin: left center; animation: unfoldR .9s cubic-bezier(.2,.75,.25,1) both; }
+.spread.unfold .page-inner > * { animation: inkIn .8s .35s ease both; }
+@keyframes unfoldL { from { transform: rotateY(75deg); opacity: .2; } }
+@keyframes unfoldR { from { transform: rotateY(-40deg); opacity: .4; } }
+@keyframes inkIn { from { opacity: 0; transform: translateY(6px); } }
+
+/* перелистывание: лист чуть приподнимается, мягкая S-кривая скорости */
+.flipping-next { animation: flipNext .95s cubic-bezier(.36,.07,.2,1) forwards; }
+.flipping-prev { animation: flipPrev .95s cubic-bezier(.36,.07,.2,1) forwards; }
+@keyframes flipNext {
+  0% { transform: rotateY(0) translateZ(0); }
+  12% { transform: rotateY(-8deg) translateZ(6px); }
+  50% { transform: rotateY(-90deg) translateZ(26px); }
+  100% { transform: rotateY(-180deg) translateZ(0); }
+}
+@keyframes flipPrev {
+  0% { transform: rotateY(0) translateZ(0); }
+  12% { transform: rotateY(8deg) translateZ(6px); }
+  50% { transform: rotateY(90deg) translateZ(26px); }
+  100% { transform: rotateY(180deg) translateZ(0); }
+}
+/* свет и тень на самом листе: темнеет, когда встаёт ребром */
+.leaf-shade { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.leaf-right .front .leaf-shade, .leaf-left .back .leaf-shade { background: linear-gradient(90deg, rgba(40,20,5,.45), rgba(40,20,5,0) 60%); }
+.leaf-right .back .leaf-shade, .leaf-left .front .leaf-shade { background: linear-gradient(270deg, rgba(40,20,5,.45), rgba(40,20,5,0) 60%); }
+.flipping-next .front .leaf-shade, .flipping-prev .front .leaf-shade { animation: shadeA .95s cubic-bezier(.36,.07,.2,1) forwards; }
+.flipping-next .back .leaf-shade, .flipping-prev .back .leaf-shade { animation: shadeB .95s cubic-bezier(.36,.07,.2,1) forwards; }
+@keyframes shadeA { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes shadeB { 0% { opacity: 1; } 50% { opacity: 1; } 100% { opacity: 0; } }
+/* тень листа на странице под ним */
+.under-shade { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 4; pointer-events: none; opacity: 0; }
+.under-shade.next { left: 50%; background: linear-gradient(90deg, rgba(30,15,5,.4), rgba(30,15,5,0) 70%); animation: under .95s ease forwards; }
+.under-shade.prev { left: 0; background: linear-gradient(270deg, rgba(30,15,5,.4), rgba(30,15,5,0) 70%); animation: under .95s ease forwards; }
+@keyframes under { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+
+/* на столе: страницы проявляются, когда 3D-обложка уже поднялась */
+.album.on-desk { animation: deskIn .8s .3s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes deskIn { from { opacity: 0; filter: brightness(.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .album, .album-wrap, .spread.unfold .page-left, .spread.unfold .page-right, .spread.unfold .page-inner > * { animation-duration: .01s !important; }
+}
+
+/* ======================================================================
+   Единый стиль: интерфейс из той же винтажной бумаги и кожи, что и дневник
+   ====================================================================== */
+:root {
+  --font-diary: "Comic Sans MS", "Comic Sans", "Pangolin", cursive;
+  --kraft: #e7d3ac;
+  --kraft-2: #d9bf91;
+  --kraft-ink: #3a2618;
+  --kraft-muted: #7a5c40;
+  --leather: radial-gradient(ellipse at 40% 30%, #6e4126, #3b2214);
+  --gold: #e3c27d;
+  --wax: #8e1f24;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .22  0 0 0 0 .1  0 0 0 .45 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  --paper-bg: var(--grain), radial-gradient(ellipse at 20% 10%, rgba(255,245,220,.55), transparent 60%), radial-gradient(ellipse at 90% 95%, rgba(110,70,30,.18), transparent 55%), linear-gradient(180deg, #efdfbf, #e2cc9f);
+  --paper: #efdfbf;
+  --paper-2: #e2cc9f;
+  --ink: #3a2618;
+  --muted: #7a5c40;
+  --accent: #a8432f;
+  --accent-2: #5b6e58;
+  font-family: var(--font-diary);
+}
+body, button, input, textarea, select { font-family: var(--font-diary); }
+
+/* бумажная табличка */
+.onboard, .phase, .keyhint, .ai-badge, .tag, .toast,
+.actions button, .lamp-menu, .pet-menu, .pet-menu button, .lamp-power {
+  background: var(--paper-bg);
+  color: var(--kraft-ink);
+  border: 1px solid rgba(90,55,25,.35);
+  box-shadow: 0 6px 16px rgba(20,10,0,.28), inset 0 0 0 3px rgba(255,248,230,.35);
+  backdrop-filter: none;
+  text-shadow: none;
+}
+.onboard, .phase, .keyhint { border-radius: 10px; }
+.onboard b { color: var(--wax); }
+.ai-badge { border-radius: 8px; }
+.ai-badge.on { background: var(--wax); color: #f6e6c6; }
+.time-chip:hover, .actions button:hover { background: var(--paper-bg); filter: brightness(1.06); transform: translateY(-1px) rotate(-.4deg); }
+.actions button { border-radius: 10px; transition: transform .2s, filter .2s; }
+.toast { background: var(--paper-bg); border-left: 4px solid var(--wax); }
+
+/* нижняя панель — кожаный ремешок со строчкой */
+.dock {
+  background: var(--leather); border: 0; backdrop-filter: none;
+  box-shadow: 0 10px 26px rgba(0,0,0,.4), inset 0 0 0 2px rgba(227,194,125,.35);
+  outline: 1.5px dashed rgba(227,194,125,.45); outline-offset: -6px;
+}
+.dock button { color: #f3e3c3; }
+.dock button:hover, .dock button.on { background: var(--paper-bg); color: var(--kraft-ink); }
+
+/* карточка дня — страница из дневника */
+.now {
+  background: var(--paper-bg); color: var(--kraft-ink); backdrop-filter: none;
+  border: 1px solid rgba(90,55,25,.35); border-left-width: 6px; border-radius: 6px 14px 14px 6px;
+  box-shadow: 0 16px 36px rgba(0,0,0,.4);
+}
+.now-tags span { background: rgba(90,55,25,.12); }
+.now-song, .now-desc { opacity: .85; }
+
+/* кнопки: главная — сургучная печать, второстепенная — карандашная обводка */
+.primary {
+  background: linear-gradient(180deg, #a8432f, #8e1f24); color: #fbecd0; border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(110,25,20,.35), inset 0 1px 0 rgba(255,220,190,.25);
+}
+.ghost { border: 1.5px dashed rgba(58,38,24,.45); color: var(--kraft-ink); border-radius: 10px; }
+.album-nav .ghost { background: var(--paper-bg); color: var(--kraft-ink); border: 1px solid rgba(90,55,25,.35); }
+.album-nav { color: #f3e3c3; }
+.close { background: radial-gradient(circle at 35% 30%, #b8443a, #7a1a1f); color: #fbecd0; box-shadow: 0 4px 12px rgba(0,0,0,.35), inset 0 0 0 3px rgba(255,210,180,.18); }
+
+/* формы и панели — листы бумаги с полями и линовкой */
+.modal, .custom {
+  background: var(--paper-bg); color: var(--kraft-ink); border-radius: 8px;
+  box-shadow: 0 30px 60px rgba(0,0,0,.45), inset 0 0 40px rgba(110,70,30,.18);
+  border-left: 3px double rgba(168,67,47,.35);
+}
+.modal h2, .custom h2 { font-family: var(--font-diary); font-weight: 700; color: var(--kraft-ink); }
+.field input:not([type=file]), .field textarea {
+  background: rgba(255,250,236,.75); border: 0; border-bottom: 1.5px solid rgba(90,55,25,.35); border-radius: 4px 4px 0 0;
+}
+.field textarea {
+  background: repeating-linear-gradient(180deg, rgba(255,250,236,.75) 0 27px, rgba(90,120,160,.22) 27px 28px);
+  line-height: 28px; padding-top: 6px;
+}
+.field input:focus, .field textarea:focus { outline: 2px solid rgba(168,67,47,.35); outline-offset: 1px; }
+.tabs button, .chips button { background: rgba(255,250,236,.6); border: 1px dashed rgba(90,55,25,.4); color: var(--kraft-ink); }
+.tabs button.on, .chips button.on { background: var(--wax); color: #fbecd0; border-style: solid; }
+.thumb { border-color: rgba(90,55,25,.35); }
+.custom-sec { border-top-color: rgba(90,55,25,.3); }
+
+/* меню у предметов */
+.lamp-menu { color: var(--kraft-ink); }
+.lamp-menu .lamp-tone:hover { background: rgba(90,55,25,.1); }
+.lamp-power.on { background: var(--wax); color: #fbecd0; }
+.pet-menu button { font-family: var(--font-diary); }
+.pet-menu { padding: 8px; border-radius: 10px; }
+
+/* ======================================================================
+   Экран загрузки — дневник на столе
+   ====================================================================== */
+.loader {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; justify-items: center; gap: 22px;
+  background: radial-gradient(ellipse at 50% 40%, #3a2a20, #15100c 75%);
+  color: #f3e3c3; transition: opacity .9s ease, filter .9s ease;
+}
+.loader.leave { opacity: 0; filter: blur(6px); pointer-events: none; }
+.loader.leave .loader-book { transform: scale(1.25) translateY(-10px); transition: transform .9s cubic-bezier(.5,0,.3,1); }
+.loader-book {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(520px, 86vw); aspect-ratio: 2 / 1.25;
+  perspective: 1400px; filter: drop-shadow(0 30px 40px rgba(0,0,0,.55));
+}
+.loader-book::before {
+  content: ""; position: absolute; inset: -12px; border-radius: 14px; z-index: -1; background: var(--leather);
+  box-shadow: inset 0 0 0 2px rgba(227,194,125,.35); outline: 1.5px dashed rgba(227,194,125,.4); outline-offset: -7px;
+}
+.loader-page { background: var(--paper-bg); position: relative; }
+.loader-page.right { border-radius: 0 6px 6px 0; box-shadow: inset 16px 0 22px -12px rgba(60,35,15,.45); }
+.loader-page.left {
+  border-radius: 6px 0 0 6px; box-shadow: inset -16px 0 22px -12px rgba(30,15,5,.5);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--kraft-ink);
+}
+.loader-spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 6px; transform: translateX(-3px); background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.05), rgba(0,0,0,.35)); }
+/* надпись «пишется» пером */
+.loader-ink { width: 86%; }
+.loader-ink text {
+  font: 700 64px "Caveat", var(--font-diary); fill: transparent; stroke: #3a2618; stroke-width: 1.2;
+  stroke-dasharray: 600; stroke-dashoffset: 600; animation: write 2.2s .2s ease forwards, inkFill .8s 1.8s ease forwards;
+}
+@keyframes write { to { stroke-dashoffset: 0; } }
+@keyframes inkFill { to { fill: #3a2618; } }
+.loader-sub { font-size: 14px; letter-spacing: 2px; opacity: 0; animation: inkIn .8s 1.6s ease forwards; }
+/* листы перелистываются по кругу */
+.loader-leaf {
+  position: absolute; left: 50%; top: 0; width: 50%; height: 100%; transform-origin: left center;
+  background: var(--paper-bg); border-radius: 0 6px 6px 0; backface-visibility: visible;
+  animation: leafLoop 2.4s cubic-bezier(.45,.05,.3,1) infinite; box-shadow: inset 12px 0 18px -10px rgba(60,35,15,.45);
+}
+.loader-leaf.l2 { animation-delay: .8s; }
+.loader-leaf.l3 { animation-delay: 1.6s; }
+@keyframes leafLoop {
+  0% { transform: rotateY(0); opacity: 0; }
+  8% { transform: rotateY(-4deg); opacity: 1; }
+  42% { transform: rotateY(-140deg); filter: brightness(.8); opacity: .9; }
+  52%, 100% { transform: rotateY(-178deg); opacity: 0; }
+}
+.loader-line { font-size: 17px; opacity: .9; animation: inkIn .5s ease both; min-height: 1.4em; }
+.loader-bar { width: min(260px, 70vw); height: 4px; border-radius: 4px; background: rgba(243,227,195,.18); overflow: hidden; }
+.loader-bar i { display: block; height: 100%; background: var(--gold); transition: width .4s ease; }
+
+/* ======================================================================
+   Вход в воспоминание: виньетка, плёночное зерно, карточка дня
+   ====================================================================== */
+.mem-transition { position: fixed; inset: 0; pointer-events: none; z-index: 15; }
+.mem-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, transparent 55%, rgba(18,10,4,.55) 93%); }
+.mem-grain { position: absolute; inset: 0; background: var(--grain); opacity: 0; mix-blend-mode: multiply; }
+/* персонаж идёт к наушникам — края чуть темнеют */
+.mem-transition.prep .mem-vignette { animation: vPrep 1.2s ease forwards; }
+@keyframes vPrep { from { opacity: 0; } to { opacity: .55; } }
+/* вход: виньетка сжимается, тёплая сепия, потом раскрывается */
+.mem-transition.enter .mem-vignette { animation: vEnter 3.2s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes vEnter {
+  0% { opacity: .55; background: radial-gradient(ellipse at 50% 48%, transparent 55%, rgba(18,10,4,.55) 93%); }
+  35% { opacity: 1; background: radial-gradient(ellipse at 50% 48%, rgba(255,220,160,.08) 18%, rgba(18,10,4,.92) 62%); }
+  55% { opacity: 1; background: radial-gradient(ellipse at 50% 48%, rgba(255,220,160,.06) 22%, rgba(18,10,4,.9) 66%); }
+  100% { opacity: 1; background: radial-gradient(ellipse at 50% 48%, transparent 58%, rgba(18,10,4,.5) 100%); }
+}
+.mem-transition.enter .mem-grain { animation: grain 3.2s ease forwards; }
+@keyframes grain { 0% { opacity: 0; } 30%, 60% { opacity: .35; } 100% { opacity: .08; } }
+.mem-transition.steady .mem-vignette { background: radial-gradient(ellipse at 50% 48%, transparent 58%, rgba(18,10,4,.5) 100%); }
+.mem-transition.steady .mem-grain { opacity: .08; }
+.mem-transition.exit { animation: fadeOut 1.2s ease forwards; }
+.mem-transition.exit .mem-vignette { background: radial-gradient(ellipse at 50% 48%, transparent 58%, rgba(18,10,4,.5) 100%); }
+/* дата и название дня проступают, как чернила */
+.mem-card { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; color: #f6e6c6; text-shadow: 0 2px 18px rgba(0,0,0,.7); animation: card 3.2s ease forwards; white-space: nowrap; }
+.mem-card-date { font-family: "Special Elite", var(--font-diary); font-size: 18px; letter-spacing: 3px; opacity: .85; }
+.mem-card-title { font-family: var(--font-diary); font-size: clamp(30px, 5vw, 54px); font-weight: 700; margin-top: 6px; }
+@keyframes card {
+  0%, 18% { opacity: 0; transform: translate(-50%, -40%); filter: blur(6px); letter-spacing: 6px; }
+  38%, 62% { opacity: 1; transform: translate(-50%, -50%); filter: blur(0); letter-spacing: 1px; }
+  100% { opacity: 0; transform: translate(-50%, -58%); filter: blur(3px); }
+}
+@media (prefers-reduced-motion: reduce) { .mem-card { animation-duration: .01s; } }
+
+/* подсказка сверху не наезжает на ярлыки в шапке */
+.onboard { top: 66px; }
+.phase { top: 66px; }
+@media (max-width: 700px) { .phase { top: 112px; } }
+.field textarea { background-position: 0 6px; background-attachment: local; }
+input[type=file] { font-size: 13px; color: var(--kraft-muted); }
+input[type=file]::file-selector-button {
+  font-family: var(--font-diary); margin-right: 10px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  border: 1.5px dashed rgba(58,38,24,.45); background: rgba(255,250,236,.7); color: var(--kraft-ink);
+}
+.thumb.add { background: rgba(255,250,236,.7); }
