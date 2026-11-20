@@ -1,4 +1,5 @@
 import { Canvas, useThree } from "@react-three/fiber";
+import { useRef } from "react";
 import { OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Suspense, useEffect } from "react";
 import { useQuality, useQualitySettings } from "./quality";
@@ -15,12 +16,14 @@ import { Room } from "./Room";
 export function Scene() {
   return (
     <Canvas
+      frameloop="demand"
       shadows
       dpr={1}
       camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
     >
       <QualityRig />
+      <FrameLimiter />
       <Suspense fallback={null}>
         <AtmosphereRig />
         <Room />
@@ -74,4 +77,26 @@ function QualityRig() {
       onFallback={() => useQuality.setState({ autoLevel: "medium" })}
     />
   );
+}
+
+/**
+ * Не больше 60 кадров в секунду: на мониторах 120–165 Гц это вдвое
+ * снижает нагрузку на видеокарту, а глазу разницы почти не видно.
+ */
+function FrameLimiter() {
+  const invalidate = useThree((s) => s.invalidate);
+  const last = useRef(0);
+  useEffect(() => {
+    let id = 0;
+    const tick = (now: number) => {
+      id = requestAnimationFrame(tick);
+      if (now - last.current >= 1000 / 60 - 2) {
+        last.current = now;
+        invalidate();
+      }
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [invalidate]);
+  return null;
 }

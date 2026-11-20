@@ -26,7 +26,14 @@ type HSEffectLike = { saturation: number };
 export function AtmosphereRig() {
   const key = useRef<THREE.DirectionalLight>(null);
   const hemi = useRef<THREE.HemisphereLight>(null);
-  const lamp = useRef<THREE.PointLight>(null);
+  // настольная лампа светит конусом вниз, на стол, а не во все стороны —
+  // так на стене за ней не появляется яркое пятно
+  const lamp = useRef<THREE.SpotLight>(null);
+  const lampFill = useRef<THREE.PointLight>(null);
+  const lampTarget = useRef<THREE.Object3D>(null);
+  useEffect(() => {
+    if (lamp.current && lampTarget.current) lamp.current.target = lampTarget.current;
+  }, []);
   const floorLamp = useRef<THREE.PointLight>(null);
   const bloom = useRef<EffectWithIntensity>(null);
   const vignette = useRef<VignetteEffectLike>(null);
@@ -155,7 +162,9 @@ export function AtmosphereRig() {
     deskLampColor(tmp);
     st.deskColor.lerp(tmp, 1 - Math.exp(-6 * dt));
     lamp.current!.color.copy(st.deskColor);
-    lamp.current!.intensity = (1.2 + live.night * 4) * pulse * (1 + Math.sin(t * 7) * 0.01) * st.deskOn;
+    lamp.current!.intensity = (2.2 + live.night * 6) * pulse * (1 + Math.sin(t * 7) * 0.01) * st.deskOn;
+    lampFill.current!.color.copy(st.deskColor);
+    lampFill.current!.intensity = (0.08 + live.night * 0.18) * st.deskOn;
     // торшер плавно гаснет и зажигается шнурком
     st.floorOn += ((props.lampOn ? 1 : 0) - st.floorOn) * (1 - Math.exp(-6 * dt));
     floorLamp.current!.color.copy(live.lampColor);
@@ -220,6 +229,8 @@ export function AtmosphereRig() {
         shadow-mapSize={[q.shadowSize, q.shadowSize]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
+        shadow-radius={q.level === "low" ? 2 : 4}
+        shadow-blurSamples={q.level === "low" ? 6 : 10}
         shadow-camera-left={-7}
         shadow-camera-right={7}
         shadow-camera-top={7}
@@ -240,7 +251,9 @@ export function AtmosphereRig() {
         <mesh position={[0, 0.42, 0]} material={lampShade}>
           <cylinderGeometry args={[0.1, 0.17, 0.18, 20, 1, true]} />
         </mesh>
-        <pointLight ref={lamp} position={[0, 0.35, 0]} distance={5} decay={1.6} castShadow={false} />
+        <spotLight ref={lamp} position={[0, 0.36, 0]} angle={0.8} penumbra={0.9} distance={3.5} decay={1.6} castShadow={false} />
+        <object3D ref={lampTarget} position={[-0.05, -0.8, 0.45]} />
+        <pointLight ref={lampFill} position={[0, 0.3, 0.12]} distance={0.55} decay={2} />
         <DeskLampControl />
       </group>
       <pointLight ref={floorLamp} position={[FLOOR_LAMP.x, 1.55, FLOOR_LAMP.z]} distance={5} decay={1.6} />

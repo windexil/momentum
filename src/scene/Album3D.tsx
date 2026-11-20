@@ -55,10 +55,10 @@ function drawCover(canvas: HTMLCanvasElement, text: string) {
   g.textAlign = "center";
   g.textBaseline = "middle";
   let size = 92;
-  g.font = `700 ${size}px Caveat, cursive`;
+  g.font = `700 ${size}px "Comic Sans MS", Pangolin, cursive`;
   while (g.measureText(text).width > W - 140 && size > 36) {
     size -= 4;
-    g.font = `700 ${size}px Caveat, cursive`;
+    g.font = `700 ${size}px "Comic Sans MS", Pangolin, cursive`;
   }
   g.fillStyle = "rgba(0,0,0,.45)";
   g.fillText(text, W / 2 + 2, H * 0.46 + 3);
@@ -167,10 +167,6 @@ export function Album3D() {
           <boxGeometry args={[0.025, 0.035, 0.05]} />
         </mesh>
       </group>
-      {/* лента-закладка свисает из блока страниц */}
-      <mesh position={[-0.05, 0.03, 0.24]} rotation-x={0.25} material={mats.ribbon}>
-        <boxGeometry args={[0.025, 0.004, 0.12]} />
-      </mesh>
       {open && atDesk && (
         <Html transform position={[0.31, 0.1, 0]} rotation-x={-Math.PI / 2} scale={0.04} zIndexRange={[20, 0]}>
           <div onPointerDown={(e) => e.stopPropagation()}>

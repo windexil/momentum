@@ -99,7 +99,7 @@ export function Particles() {
       }),
     [textures],
   );
-  const state = useRef({ type: "dust" as ParticleType, fade: 0 });
+  const state = useRef({ type: "dust" as ParticleType, fade: 0, on: 0 });
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -123,7 +123,11 @@ export function Particles() {
 
     const style = STYLE[s.type];
     const speed = live.particleSpeed * (1 + live.level * live.musicReactivity * 1.5);
-    const count = Math.min(MAX, Math.round(live.particleCount));
+    // пылинки и прочие частицы видны только пока воспроизводится воспоминание
+    const { phase } = useStore.getState();
+    const playing = phase === "listening" || phase === "unwinding";
+    s.on += ((playing ? 1 : 0) - s.on) * (1 - Math.exp(-(playing ? 1.2 : 2.5) * dt));
+    const count = s.on < 0.01 ? 0 : Math.min(MAX, Math.round(live.particleCount * s.on));
     geo.setDrawRange(0, count);
 
     for (let i = 0; i < count; i++) {
