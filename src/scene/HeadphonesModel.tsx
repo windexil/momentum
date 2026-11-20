@@ -19,7 +19,7 @@ export function HeadphonesModel({ body, pads }: { body: THREE.Material; pads: TH
     });
     return o;
   }, [scene, body, pads]);
-  // чуть крупнее головы, чтобы чашки ложились поверх капюшона
+  // подогнано под голову (r=0.3), чуть шире — чашки ложатся поверх капюшона
   return <primitive object={obj} scale={1.1} />;
 }
 
