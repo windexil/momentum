@@ -116,7 +116,7 @@ const ALB_EYE = new THREE.Vector3(DESK.x + 0.09, 1.76, DESK.z + 0.1);
 // насколько можно повернуть взгляд за столом (радианы)
 const Q_DOWN = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 // влево (к окну и кровати) можно дальше, вправо — до шкафа, чтобы не смотреть «за стену»
-const YAW_LEFT = 1.1, YAW_RIGHT = 0.5, PITCH_MAX = 0.75;
+const YAW_LEFT = 1.4, YAW_RIGHT = 0.85, PITCH_MAX = 0.8; // обзор за столом шире на ~35°
 
 /**
  * Камера следует за персонажем: точка, вокруг которой она вращается,

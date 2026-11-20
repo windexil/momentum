@@ -10,6 +10,7 @@ import { Character } from "./Character";
 import { CameraFollow, Interact } from "./Interact";
 import { Particles } from "./Particles";
 import { PhotoStrip } from "./PhotoStrip";
+import { Garland } from "./Garland";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
 
@@ -29,6 +30,7 @@ export function Scene() {
         <Room />
         <Album3D />
         <PhotoStrip />
+        <Garland />
         <Character />
         <Pet />
         <Interact />
@@ -44,8 +46,8 @@ export function Scene() {
         maxDistance={18}
         minPolarAngle={0.55}
         maxPolarAngle={1.25}
-        minAzimuthAngle={0.15}
-        maxAzimuthAngle={Math.PI / 2 - 0.15}
+        minAzimuthAngle={-0.15}
+        maxAzimuthAngle={Math.PI / 2 + 0.15}
         enableDamping
         dampingFactor={0.08}
       />
