@@ -64,6 +64,20 @@ export const useStore = create<State>((set, get) => ({
       // демо всегда берём свежие, чтобы улучшения анализатора были видны сразу
       const fresh = new Map(buildDemoMemories().map((d) => [d.id, d]));
       memories = memories.map((m) => (m.demo && fresh.get(m.id)) || m);
+      // новые демо-дни (лес и город) добавляем один раз и тем, у кого альбом уже был
+      let added = false;
+      try {
+        added = localStorage.getItem("arttech-demos-v2") === "1";
+        localStorage.setItem("arttech-demos-v2", "1");
+      } catch {
+        added = true;
+      }
+      if (!added) {
+        const have = new Set(memories.map((m) => m.id));
+        const extra = [...fresh.values()].filter((d) => !have.has(d.id));
+        await Promise.all(extra.map(saveMemory)).catch(() => undefined);
+        memories = [...memories, ...extra].sort((a, b) => a.date.localeCompare(b.date));
+      }
     }
     set({ memories, loaded: true });
     audio.onEnded = () => get().stopReliving();
