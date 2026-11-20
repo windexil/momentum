@@ -72,3 +72,7 @@ server/index.ts Express + Claude API (/api/health, /api/analyze)
 ## Технологии
 
 React 19, TypeScript, Vite, Three.js, @react-three/fiber, @react-three/drei, @react-three/postprocessing, zustand, idb-keyval, Express, @anthropic-ai/sdk (Claude), Web Audio API.
+
+## Авторы
+
+Сторонние 3D-материалы и их лицензии перечислены в [CREDITS.md](CREDITS.md).
