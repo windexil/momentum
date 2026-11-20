@@ -5,6 +5,7 @@
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { sfx } from "../audio/roomSfx";
 import { ROOM } from "./Room";
 import { live } from "./live";
 
@@ -68,6 +69,7 @@ export function Garland() {
   const toggle = (e: ThreeEvent<MouseEvent>) => {
     if (e.delta > 6) return;
     e.stopPropagation();
+    sfx.click(0.35, 0.4);
     setOn((v) => !v);
   };
 

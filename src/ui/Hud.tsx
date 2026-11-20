@@ -1,3 +1,4 @@
+import { useSfx } from "../audio/roomSfx";
 import { SERVICE_RU } from "../audio/embed";
 import { useQuality, type QualityLevel, type QualityMode } from "../scene/quality";
 import { useEffect, useState } from "react";
@@ -47,6 +48,7 @@ export function Hud() {
         </div>
         <TimeChip />
         <QualityChip />
+        <SoundChip />
       </header>
 
       {phase === "idle" && panel === "none" && (
@@ -112,6 +114,15 @@ export function Hud() {
 /** Время в комнате (как на настенных часах); клик — на час вперёд. */
 const Q_NEXT: Record<QualityMode, QualityMode> = { auto: "high", high: "medium", medium: "low", low: "auto" };
 const Q_RU: Record<QualityMode | QualityLevel, string> = { auto: "авто", high: "высокая", medium: "средняя", low: "низкая" };
+
+function SoundChip() {
+  const on = useSfx((s) => s.on);
+  return (
+    <button className="ai-badge time-chip" title="Звуки комнаты: шаги, часы, кот" onClick={() => useSfx.getState().toggle()}>
+      {on ? "🔊 Звуки" : "🔇 Звуки выкл."}
+    </button>
+  );
+}
 
 function QualityChip() {
   const mode = useQuality((s) => s.mode);

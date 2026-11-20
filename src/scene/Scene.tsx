@@ -11,6 +11,7 @@ import { CameraFollow, Interact } from "./Interact";
 import { Particles } from "./Particles";
 import { PhotoStrip } from "./PhotoStrip";
 import { Garland } from "./Garland";
+import { RoomSounds } from "./RoomSounds";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
 
@@ -31,6 +32,7 @@ export function Scene() {
         <Album3D />
         <PhotoStrip />
         <Garland />
+        <RoomSounds />
         <Character />
         <Pet />
         <Interact />

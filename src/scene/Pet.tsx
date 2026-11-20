@@ -17,7 +17,14 @@ import { heroCmd } from "./heroControl";
 /** Команды питомцу из интерфейса: позвать к себе или погладить. */
 const petReq = { call: false, pet: false };
 /** Где сейчас питомец (для кнопок и подхода персонажа) */
-export const petInfo = { pos: new THREE.Vector3(0.8, 0, -0.9), present: false };
+export const petInfo = {
+  pos: new THREE.Vector3(0.8, 0, -0.9),
+  present: false,
+  /** что сейчас делает (для звуков) */
+  mode: "rest" as string,
+  /** 0..1 насколько его гладят */
+  pet: 0,
+};
 export const petCmd = {
   call() {
     petReq.call = true;
@@ -278,6 +285,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     const lying = !moving && st.mode !== "petting" && (mood === "sleepy" || (wantBed && st.onBed > 0.99)) ? 1 : 0;
     petInfo.pos.copy(st.pos);
     petInfo.present = true;
+    petInfo.mode = st.mode;
     st.lie += (lying - st.lie) * (1 - Math.exp(-4 * dt));
 
     // Анимация по настроению
@@ -318,6 +326,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     body.current!.position.y = -st.lie * 0.06 + Math.abs(Math.sin(st.walk)) * 0.035 * st.moving;
     // когда гладят — привстаёт на задние лапы и тянется головой к руке
     st.pet += ((st.mode === "petting" ? 1 : 0) - st.pet) * (1 - Math.exp(-5 * dt));
+    petInfo.pet = st.pet;
     hero.petting = st.pet;
     const rub = Math.sin(t * 3.2) * st.pet;
     body.current!.rotation.z = tilt + rub * 0.08;

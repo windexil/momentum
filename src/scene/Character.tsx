@@ -31,6 +31,9 @@ export const hero = {
   listening: false,
   /** 0..1 — персонаж гладит питомца (рука тянется вниз) */
   petting: 0,
+  /** фаза шага и сила ходьбы (для звука шагов) */
+  walk: 0,
+  moveAmt: 0,
 };
 
 // Пропорции чиби
@@ -318,6 +321,8 @@ export function Character() {
     else if (faceAngle !== null) st.rot += angleTo(st.rot, faceAngle) * (1 - Math.exp(-7 * dt));
     const moveAmt = Math.min(1, speed / MAX_SPEED);
     st.walk += dt * (4 + 8 * moveAmt) * Math.min(1, speed * 3);
+    hero.walk = st.walk;
+    hero.moveAmt = moveAmt;
 
     // ---- Корень ----
     // Кресло: пятимся к сиденью. Кровать: фаза A — садимся на край,
