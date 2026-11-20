@@ -11,7 +11,35 @@ import { useStore } from "../store";
 import { hero } from "./Character";
 import { CHAIR } from "./Room";
 import { live } from "./live";
-import { findPath, moveWithCollision, nearestFree } from "./nav";
+import { BOUNDS, findPath, moveWithCollision, nearestFree } from "./nav";
+import { heroCmd } from "./heroControl";
+
+/** Команды питомцу из интерфейса: позвать к себе или погладить. */
+const petReq = { call: false, pet: false };
+/** Где сейчас питомец (для кнопок и подхода персонажа) */
+export const petInfo = { pos: new THREE.Vector3(0.8, 0, -0.9), present: false };
+export const petCmd = {
+  call() {
+    petReq.call = true;
+  },
+  pet() {
+    petReq.pet = true;
+    // персонаж подходит к питомцу и встаёт к нему лицом
+    const p = petInfo.pos;
+    const dir = new THREE.Vector3().subVectors(hero.pos, p).setY(0);
+    if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
+    dir.normalize();
+    const spot = p.clone().addScaledVector(dir, 0.5);
+    heroCmd.walkTo(spot);
+  },
+};
+
+const randomSpot = () =>
+  nearestFree(
+    THREE.MathUtils.lerp(BOUNDS.min + 0.5, BOUNDS.max - 0.5, Math.random()),
+    THREE.MathUtils.lerp(BOUNDS.min + 0.5, BOUNDS.max - 0.5, Math.random()),
+    PET_R,
+  );
 
 // Хвост кошки: гладкая трубка знаком вопроса (вверх и завиток к спине).
 const CAT_TAIL_CURVE = new THREE.CatmullRomCurve3([
@@ -72,11 +100,26 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   const tongue = useRef<THREE.Mesh>(null);
   const legs = useRef<THREE.Group[]>([]);
   const [bubble, setBubble] = useState<PetState>("idle");
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest?.(".pet-menu")) setMenu(false);
+    };
+    const id = setTimeout(() => window.addEventListener("pointerdown", close), 0);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("pointerdown", close);
+    };
+  }, [menu]);
   const st = useMemo(
     () => ({
       pos: new THREE.Vector3(0.8, 0, -0.9), rot: 0, walk: 0, moving: 0, lie: 0, onBed: 0, mood: "idle" as PetState, blink: 0,
       // маршрут в обход мебели
       path: [] as THREE.Vector3[], planGoal: new THREE.Vector3(999, 0, 999), planT: 0,
+      // своя жизнь: гуляет, отдыхает, дремлет; приходит, когда зовут
+      mode: "rest" as "wander" | "rest" | "nap" | "called" | "petWait" | "petting",
+      modeT: 2, wander: new THREE.Vector3(), here: new THREE.Vector3(), arrivedT: 0,
     }),
     [],
   );
@@ -109,7 +152,9 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     const t = clock.elapsedTime;
     const chosen = useAvatar.getState().avatar.petMood;
     const { active } = useStore.getState();
-    const mood: PetState = chosen !== "auto" ? chosen : hero.listening ? moodOf(active?.atmosphere) : hero.lie > 0.5 ? "sleepy" : "idle";
+    const autoMood: PetState = hero.listening ? moodOf(active?.atmosphere) : hero.lie > 0.5 ? "sleepy" : "idle";
+    const mood: PetState =
+      st.mode === "petting" ? "happy" : chosen !== "auto" ? chosen : st.mode === "nap" ? "sleepy" : autoMood;
     if (mood !== st.mood) {
       st.mood = mood;
       setBubble(mood);
@@ -123,10 +168,62 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     if (wantBed) goal = BED_FLOOR;
     else if (nearChair) goal = CHAIR_SPOT;
     else {
-      // держимся чуть позади и сбоку от персонажа
-      tmp.target.set(-0.6, 0, -0.45).applyAxisAngle(THREE.Object3D.DEFAULT_UP, hero.rot).add(hero.pos);
-      goal = tmp.target;
-      tol = hero.moving ? 0.25 : 0.45;
+      st.modeT -= dt;
+      if (petReq.call) {
+        petReq.call = false;
+        st.mode = "called";
+        st.modeT = 20;
+        st.arrivedT = 0;
+      }
+      if (petReq.pet) {
+        petReq.pet = false;
+        st.mode = "petWait";
+        st.modeT = 15;
+      }
+      const stay = () => tmp.target.copy(st.pos);
+      const dHero = Math.hypot(hero.pos.x - st.pos.x, hero.pos.z - st.pos.z);
+      switch (st.mode) {
+        case "called": {
+          // бежит к персонажу и садится перед ним
+          tmp.target.set(0, 0, 0.55).applyAxisAngle(THREE.Object3D.DEFAULT_UP, hero.rot).add(hero.pos);
+          goal = tmp.target;
+          tol = 0.25;
+          if (dHero < 0.9) st.arrivedT += dt;
+          if (st.arrivedT > 6 || st.modeT <= 0) (st.mode = "rest"), (st.modeT = 3 + Math.random() * 4);
+          break;
+        }
+        case "petWait":
+          goal = stay();
+          tol = 1;
+          if (dHero < 0.75 && !hero.moving) (st.mode = "petting"), (st.modeT = 3.5);
+          else if (st.modeT <= 0) (st.mode = "rest"), (st.modeT = 3);
+          break;
+        case "petting":
+          goal = stay();
+          tol = 1;
+          if (st.modeT <= 0) (st.mode = "rest"), (st.modeT = 4 + Math.random() * 3);
+          break;
+        case "wander":
+          goal = st.wander;
+          tol = 0.15;
+          if (st.pos.distanceTo(st.wander) < 0.2 || st.modeT <= 0) {
+            const roll = Math.random();
+            st.mode = roll < 0.25 ? "nap" : "rest";
+            st.modeT = st.mode === "nap" ? 12 + Math.random() * 12 : 3 + Math.random() * 6;
+          }
+          break;
+        default:
+          // отдых или дрёма: стоим на месте, потом идём гулять дальше
+          goal = stay();
+          tol = 1;
+          if (st.modeT <= 0) {
+            // иногда подходит к хозяину сам, чаще — в случайное место
+            if (Math.random() < 0.25) st.here.set(0, 0, 0.7).applyAxisAngle(THREE.Object3D.DEFAULT_UP, hero.rot).add(hero.pos), st.wander.copy(nearestFree(st.here.x, st.here.z, PET_R));
+            else st.wander.copy(randomSpot());
+            st.mode = "wander";
+            st.modeT = 15;
+          }
+      }
     }
 
     let moving = 0;
@@ -162,7 +259,9 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     st.moving += (moving - st.moving) * (1 - Math.exp(-10 * dt));
     st.walk += dt * 15 * st.moving;
 
-    const lying = !moving && (mood === "sleepy" || (wantBed && st.onBed > 0.99)) ? 1 : 0;
+    const lying = !moving && st.mode !== "petting" && (mood === "sleepy" || (wantBed && st.onBed > 0.99)) ? 1 : 0;
+    petInfo.pos.copy(st.pos);
+    petInfo.present = true;
     st.lie += (lying - st.lie) * (1 - Math.exp(-4 * dt));
 
     // Анимация по настроению
@@ -206,7 +305,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     earL.current!.rotation.z = 0.2 + earDroop * 0.8 + droopBase + (kind === "dog" ? Math.sin(st.walk) * 0.2 * st.moving : 0);
     earR.current!.rotation.z = -0.2 - earDroop * 0.8 - droopBase - (kind === "dog" ? Math.sin(st.walk) * 0.2 * st.moving : 0);
     st.blink = Math.sin(t * 0.9 + 1) > 0.985 ? 1 : 0;
-    const eyeClosed = mood === "sleepy" || (st.lie > 0.7 && wantBed) || st.blink;
+    const eyeClosed = mood === "sleepy" || st.mode === "petting" || (st.lie > 0.7 && wantBed) || st.blink;
     eyes.current!.scale.y += ((eyeClosed ? 0.15 : 1) - eyes.current!.scale.y) * (1 - Math.exp(-15 * dt));
     if (tongue.current) tongue.current.visible = mood === "happy" || mood === "playful" || st.moving > 0.5;
     legs.current.forEach((leg, i) => {
@@ -255,7 +354,27 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     );
 
   return (
-    <group ref={root}>
+    <group
+      ref={root}
+      onClick={(e) => {
+        if (e.delta > 6) return;
+        e.stopPropagation();
+        setMenu((m) => !m);
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => (document.body.style.cursor = "")}
+    >
+      {menu && (
+        <Html position={[0, 0.85, 0]} center zIndexRange={[40, 30]}>
+          <div className="pet-menu" onPointerDown={(e) => e.stopPropagation()}>
+            <button onClick={() => { petCmd.pet(); setMenu(false); }}>🤚 Погладить</button>
+            <button onClick={() => { petCmd.call(); setMenu(false); }}>📣 Позвать к себе</button>
+          </div>
+        </Html>
+      )}
       <group ref={body}>
         {/* тело: круглое «плюшевое» */}
         <mesh position={[0, 0.15, -0.03]} castShadow material={mats.fur} scale={[0.95, 0.9, 1.1]}>
@@ -351,3 +470,5 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     </group>
   );
 }
+
+if (import.meta.env.DEV) (window as unknown as { __pet: unknown }).__pet = { info: petInfo, cmd: petCmd, hero };

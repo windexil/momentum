@@ -4,12 +4,15 @@
 import { useEffect, useState } from "react";
 import { heroCmd, useHeroUI } from "../scene/heroControl";
 import { useStore } from "../store";
+import { useAvatar } from "../avatar";
+import { petCmd } from "../scene/Pet";
 
 export function ActionBar() {
   const { pose, hp } = useHeroUI();
   const phase = useStore((s) => s.phase);
   const stop = useStore((s) => s.stopReliving);
   const listening = phase === "listening";
+  const hasPet = useAvatar((s) => s.avatar.pet !== "none");
 
   return (
     <div className="actions">
@@ -19,6 +22,7 @@ export function ActionBar() {
       {pose !== "stand" && <button onClick={() => heroCmd.stand()}>🚶 Встать</button>}
       <button onClick={() => heroCmd.drink()}>☕ Попить какао</button>
       <button onClick={() => heroCmd.toggleLamp()}>💡 Торшер</button>
+      {hasPet && <button onClick={() => petCmd.call()}>🐾 Позвать питомца</button>}
       {hp === "table" && <button onClick={() => heroCmd.takeHp()}>🎧 Взять наушники</button>}
       {hp === "neck" && <button onClick={() => heroCmd.wearHp()}>🎧 Надеть</button>}
       {hp === "head" && (

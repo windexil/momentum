@@ -1,7 +1,8 @@
 // Форма новой записи: текст, фото и музыка. После сохранения
 // анализируем всё вместе и показываем, какую атмосферу получил день.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchOEmbed, isDirectAudio, parseMusicLink, SERVICE_RU, type OEmbedInfo } from "../audio/embed";
 import { analyzeMemory } from "../atmosphere/analyze";
 import { dominantColors, thumbnail } from "../atmosphere/color";
 import type { AudioFeatures } from "../atmosphere/types";
@@ -11,6 +12,16 @@ import type { Memory, MusicSource } from "../types";
 import { uid } from "../util";
 
 const MAX_PHOTOS = 4;
+const RIGHTS_KEY = "arttech-audio-rights";
+const AUDIO_ACCEPT = ".mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac";
+
+function rightsConfirmedBefore() {
+  try {
+    return localStorage.getItem(RIGHTS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function NewMemoryForm() {
   const setPanel = useStore((s) => s.setPanel);
@@ -25,6 +36,28 @@ export function NewMemoryForm() {
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [musicUrl, setMusicUrl] = useState("");
   const [songName, setSongName] = useState("");
+  const [artist, setArtist] = useState("");
+  const [linkInfo, setLinkInfo] = useState<OEmbedInfo | null>(null);
+  const [rightsBefore] = useState(rightsConfirmedBefore);
+  const [rights, setRights] = useState(false);
+  const link = musicMode === "url" ? parseMusicLink(musicUrl) : null;
+
+  // По ссылке подтягиваем название, исполнителя и обложку (oEmbed)
+  useEffect(() => {
+    setLinkInfo(null);
+    if (!link) return;
+    let alive = true;
+    void fetchOEmbed(link).then((info) => {
+      if (!alive) return;
+      setLinkInfo(info);
+      if (info.title) setSongName((v) => v || info.title!);
+      if (info.artist) setArtist((v) => v || info.artist!);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [link?.embedUrl]);
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState<Memory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +82,35 @@ export function NewMemoryForm() {
 
       let audioFeatures: AudioFeatures | null = null;
       let music: MusicSource;
+      if (musicMode === "file" && musicFile && !rightsBefore && !rights) {
+        setError("Подтвердите, что можете использовать этот аудиофайл.");
+        return;
+      }
+      if (musicMode === "url" && musicUrl.trim() && !link && !isDirectAudio(musicUrl)) {
+        setError("Не узнаю ссылку. Подойдут YouTube, Spotify, Яндекс Музыка (ссылка или HTML-код виджета) или прямая ссылка на mp3.");
+        return;
+      }
       if (musicMode === "file" && musicFile) {
+        try {
+          localStorage.setItem(RIGHTS_KEY, "1");
+        } catch {
+          /* ignore */
+        }
         setBusy("Слушаю музыку…");
         audioFeatures = await analyzeAudioBlob(musicFile);
-        music = { kind: "file", name: songName || musicFile.name.replace(/\.[^.]+$/, ""), blob: musicFile };
+        music = { kind: "file", name: songName || musicFile.name.replace(/\.[^.]+$/, ""), artist: artist || undefined, blob: musicFile };
+      } else if (musicMode === "url" && link) {
+        // официальный плеер; храним только ссылку, название и исполнителя
+        music = {
+          kind: "embed",
+          name: songName || linkInfo?.title || `трек из ${SERVICE_RU[link.service]}`,
+          artist: artist || linkInfo?.artist || undefined,
+          url: link.url,
+          service: link.service,
+          embedUrl: link.embedUrl,
+          embedHeight: link.height,
+          cover: linkInfo?.cover,
+        };
       } else if (musicMode === "url" && musicUrl.trim()) {
         music = { kind: "url", name: songName || musicUrl.split("/").pop() || "трек по ссылке", url: musicUrl.trim() };
       } else {
@@ -162,14 +220,40 @@ export function NewMemoryForm() {
           <span>Музыка</span>
           <div className="tabs">
             <button className={musicMode === "file" ? "on" : ""} onClick={() => setMusicMode("file")}>Файл</button>
-            <button className={musicMode === "url" ? "on" : ""} onClick={() => setMusicMode("url")}>Ссылка на аудио</button>
+            <button className={musicMode === "url" ? "on" : ""} onClick={() => setMusicMode("url")}>Ссылка на песню</button>
           </div>
           {musicMode === "file" ? (
-            <input type="file" accept="audio/*" onChange={(e) => setMusicFile(e.target.files?.[0] ?? null)} />
+            <>
+              <input type="file" accept={AUDIO_ACCEPT} onChange={(e) => setMusicFile(e.target.files?.[0] ?? null)} />
+              <small className="muted">mp3 или m4a. Файл хранится только в вашем браузере, свет и пылинки двигаются в такт музыке.</small>
+              {musicFile && !rightsBefore && (
+                <label className="rights">
+                  <input type="checkbox" checked={rights} onChange={(e) => setRights(e.target.checked)} />
+                  <span>Я подтверждаю, что могу использовать этот файл</span>
+                </label>
+              )}
+            </>
           ) : (
-            <input value={musicUrl} placeholder="https://…/track.mp3 (прямая ссылка на файл)" onChange={(e) => setMusicUrl(e.target.value)} />
+            <>
+              <input
+                value={musicUrl}
+                placeholder="Ссылка на YouTube, Spotify или Яндекс Музыку"
+                onChange={(e) => setMusicUrl(e.target.value)}
+              />
+              <small className="muted">Для Яндекс Музыки подойдёт ссылка на трек или HTML-код из «Поделиться». Играет официальный плеер сервиса, атмосфера строится по тексту записи.</small>
+              {link && (
+                <div className="link-preview">
+                  {linkInfo?.cover && <img src={linkInfo.cover} alt="" />}
+                  <div>
+                    <b>{linkInfo?.title ?? SERVICE_RU[link.service]}</b>
+                    <small>{linkInfo?.artist ? `${linkInfo.artist} · ` : ""}{SERVICE_RU[link.service]} ✓</small>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-          <input value={songName} placeholder="Исполнитель и название песни" onChange={(e) => setSongName(e.target.value)} />
+          <input value={songName} placeholder="Название песни" onChange={(e) => setSongName(e.target.value)} />
+          <input value={artist} placeholder="Исполнитель" onChange={(e) => setArtist(e.target.value)} />
           <small className="muted">Без музыки комната сыграет собственную мелодию под настроение.</small>
         </div>
 

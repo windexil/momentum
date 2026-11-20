@@ -440,3 +440,21 @@ button:disabled { opacity: 0.45; cursor: default; }
 .album.on-desk .mem-text { font-size: 21px !important; line-height: 1.45; }
 .album.on-desk .date { font-size: 22px !important; }
 .album.on-desk .song, .album.on-desk .mood { font-size: 18px !important; }
+
+/* меню питомца */
+.pet-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: rgba(28,24,22,.82); backdrop-filter: blur(10px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+.pet-menu button { border: 0; border-radius: 10px; padding: 7px 12px; background: rgba(255,255,255,.1); color: #f5ece0; font: 600 13px "Nunito", sans-serif; cursor: pointer; white-space: nowrap; }
+.pet-menu button:hover { background: rgba(255,255,255,.2); }
+
+/* официальный плеер сервиса в карточке дня */
+.now-player { margin: 4px 0 10px; }
+.now-player iframe { width: 100%; border: 0; border-radius: 12px; background: rgba(0,0,0,.25); display: block; }
+.now-player small { display: block; margin-top: 4px; font-size: 11px; opacity: .7; }
+.song-service { opacity: .7; font-weight: 600; }
+/* ссылка на песню в форме */
+.link-preview { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 12px; background: rgba(0,0,0,.05); margin-top: 6px; }
+.link-preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+.link-preview b { display: block; font-size: 14px; }
+.link-preview small { color: var(--muted); }
+.rights { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin-top: 6px; cursor: pointer; }
+.rights input { margin-top: 2px; }

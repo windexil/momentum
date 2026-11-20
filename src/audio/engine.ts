@@ -44,6 +44,8 @@ class AudioEngine {
     this.unlock();
     this.stop(0.1);
     const ctx = this.ctx!;
+    // ссылка на сервис играет в официальном плеере (iframe в карточке дня)
+    if (music.kind === "embed") return;
     if (music.kind === "synth" && music.preset) {
       this.synth = new SynthPlayer(ctx, this.master!, music.preset);
       this.synth.start();

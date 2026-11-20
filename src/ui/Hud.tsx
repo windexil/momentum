@@ -1,3 +1,4 @@
+import { SERVICE_RU } from "../audio/embed";
 import { useQuality, type QualityLevel, type QualityMode } from "../scene/quality";
 import { useEffect, useState } from "react";
 import { checkAi } from "../atmosphere/analyze";
@@ -62,9 +63,24 @@ export function Hud() {
             </div>
             <div>
               <div className="now-title">{active.title}</div>
-              <div className="now-song">♪ {active.music.name}</div>
+              <div className="now-song">
+                ♪ {active.music.name}
+                {active.music.artist ? ` — ${active.music.artist}` : ""}
+              </div>
             </div>
           </div>
+          {active.music.kind === "embed" && active.music.embedUrl && phase === "listening" && (
+            <div className="now-player">
+              <iframe
+                title={active.music.name}
+                src={active.music.embedUrl}
+                height={active.music.embedHeight ?? 160}
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+              />
+              <small>Официальный плеер {active.music.service ? SERVICE_RU[active.music.service] : ""}. Если музыка не началась, нажмите ▶ в плеере.</small>
+            </div>
+          )}
           <div className="swatches">{a.palette.map((c, i) => <span key={i} style={{ background: c }} />)}</div>
           <div className="now-mood">{a.mood}</div>
           <div className="now-desc">{a.description}</div>

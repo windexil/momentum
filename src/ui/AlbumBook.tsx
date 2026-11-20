@@ -1,6 +1,7 @@
 // Альбом воспоминаний: развороты с перелистыванием страниц (CSS 3D).
 // Левая страница — дата и фото, правая — текст, песня и настроение.
 
+import { SERVICE_RU } from "../audio/embed";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRoom } from "../roomStore";
 import { useStore } from "../store";
@@ -206,7 +207,11 @@ function RightPage({ m, onRelive, onDelete }: { m: Memory; onRelive: () => void;
       <div className="doodle" aria-hidden>✿</div>
       <h2 className="mem-title">{m.title}</h2>
       <p className="mem-text">{m.text}</p>
-      <div className="song">♪ {m.music.name || "без названия"}</div>
+      <div className="song">
+        ♪ {m.music.name || "без названия"}
+        {m.music.artist ? ` — ${m.music.artist}` : ""}
+        {m.music.kind === "embed" && m.music.service ? <span className="song-service"> · {SERVICE_RU[m.music.service]}</span> : null}
+      </div>
       <div className="mood">
         <div className="swatches">
           {m.atmosphere.palette.map((c, i) => <span key={i} style={{ background: c }} />)}
