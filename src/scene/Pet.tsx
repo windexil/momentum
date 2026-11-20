@@ -9,13 +9,15 @@ import * as THREE from "three";
 import { moodOf, useAvatar, type Mood, type PetKind } from "../avatar";
 import { useStore } from "../store";
 import { hero } from "./Character";
-import { CHAIR } from "./Room";
+import { CHAIR, DESK } from "./Room";
+import { petLink } from "./petLink";
+import { props } from "./sceneState";
 import { live } from "./live";
 import { BOUNDS, findPath, moveWithCollision, nearestFree } from "./nav";
 import { heroCmd } from "./heroControl";
 
 /** Команды питомцу из интерфейса: позвать к себе или погладить. */
-const petReq = { call: false, pet: false };
+const petReq = { call: false, pet: false, chair: false };
 /** Где сейчас питомец (для кнопок и подхода персонажа) */
 export const petInfo = {
   pos: new THREE.Vector3(0.8, 0, -0.9),
@@ -89,6 +91,10 @@ const CAT_TAIL_TIP = CAT_TAIL_CURVE.getPointAt(1).toArray() as [number, number, 
 const CHAIR_SPOT = new THREE.Vector3(CHAIR.x + 1.05, 0, CHAIR.z - 0.5);
 const BED_FLOOR = new THREE.Vector3(-1.55, 0, -0.95);
 const PET_R = 0.14;
+/** от спинки стула до центра питомца, когда он толкает лапами */
+const PUSH_GAP = 0.13;
+const REAR_TILT = 1.15;
+const REAR_LIFT = 0.13;
 const BED_SPOT = new THREE.Vector3(-2.45, 0.8, -1.05);
 const angleTo = (from: number, to: number) => ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
 const approach = (v: number, t: number, s: number) => (v < t ? Math.min(t, v + s) : Math.max(t, v - s));
@@ -134,7 +140,9 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
       // маршрут в обход мебели
       path: [] as THREE.Vector3[], planGoal: new THREE.Vector3(999, 0, 999), planT: 0,
       // своя жизнь: гуляет, отдыхает, дремлет; приходит, когда зовут
-      mode: "rest" as "wander" | "rest" | "nap" | "called" | "petWait" | "petting",
+      mode: "rest" as "wander" | "rest" | "nap" | "called" | "petWait" | "petting" | "chair",
+      // задвигаем стул: 0 — идём к спинке, 1 — встаём на задние лапы, 2 — толкаем, 3 — опускаемся
+      chairPh: 0, chairT: 0, rear: 0,
       modeT: 1, pet: 0, wander: new THREE.Vector3(), here: new THREE.Vector3(), arrivedT: 0,
     }),
     [],
@@ -162,6 +170,20 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   }, [petColor, mats]);
 
   const tmp = useMemo(() => ({ target: new THREE.Vector3(), d: new THREE.Vector3() }), []);
+
+  // персонаж может попросить задвинуть стул у письменного стола
+  useEffect(() => {
+    petLink.available = () => true;
+    petLink.pushChair = () => {
+      petReq.chair = true;
+      props.petPushing = true;
+    };
+    return () => {
+      petLink.available = () => false;
+      petLink.pushChair = () => {};
+      props.petPushing = false;
+    };
+  }, []);
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -196,6 +218,13 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
         st.mode = "petWait";
         st.modeT = 15;
       }
+      if (petReq.chair) {
+        petReq.chair = false;
+        st.mode = "chair";
+        st.modeT = 25;
+        st.chairPh = 0;
+        st.chairT = 0;
+      }
       const stay = () => tmp.target.copy(st.pos);
       const dHero = Math.hypot(hero.pos.x - st.pos.x, hero.pos.z - st.pos.z);
       switch (st.mode) {
@@ -214,6 +243,41 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
           if (dHero < 0.75 && !hero.moving) (st.mode = "petting"), (st.modeT = 3.5);
           else if (st.modeT <= 0) (st.mode = "rest"), (st.modeT = 3);
           break;
+        case "chair": {
+          // подходит к спинке выдвинутого стула, встаёт на задние лапы и задвигает его
+          const backZ = DESK.z + 1.0 + props.chairOut + PUSH_GAP;
+          const quit = () => {
+            st.mode = "rest";
+            st.modeT = 2 + Math.random() * 3;
+            props.petPushing = false;
+          };
+          if (hero.desk > 0.05 || st.modeT <= 0) {
+            quit();
+            goal = stay();
+            break;
+          }
+          if (st.chairPh === 0) {
+            tmp.target.set(DESK.x - 0.1, 0, backZ);
+            goal = tmp.target;
+            tol = 0.05;
+            if (Math.hypot(goal.x - st.pos.x, goal.z - st.pos.z) < 0.06) st.chairPh = 1;
+            break;
+          }
+          goal = stay();
+          tol = 1;
+          st.chairT += dt;
+          if (st.chairPh === 1 && st.chairT > 0.7) (st.chairPh = 2), (st.chairT = 0);
+          else if (st.chairPh === 2) {
+            props.chairOut = Math.max(0, props.chairOut - dt * 0.32);
+            st.pos.set(DESK.x - 0.1, 0, DESK.z + 1.0 + props.chairOut + PUSH_GAP);
+            if (props.chairOut <= 0) (st.chairPh = 3), (st.chairT = 0);
+          } else if (st.chairPh === 3) {
+            // опускается на четыре лапы и отходит на шаг от стула
+            st.pos.z = approach(st.pos.z, DESK.z + 1.0 + 0.3, dt * 0.4);
+            if (st.chairT > 0.7) quit();
+          }
+          break;
+        }
         case "petting":
           goal = stay();
           tol = 1;
@@ -273,6 +337,9 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
         tmp.d.normalize().multiplyScalar(Math.min(wdist, speed * dt));
         moveWithCollision(st.pos, tmp.d.x, tmp.d.z, PET_R);
         moving = 1;
+      } else if (st.mode === "chair" && st.chairPh > 0) {
+        // смотрим на стол
+        st.rot += angleTo(st.rot, Math.PI) * (1 - Math.exp(-8 * dt));
       } else {
         const look = new THREE.Vector3().subVectors(hero.pos, st.pos);
         st.rot += angleTo(st.rot, Math.atan2(look.x, look.z) + (mood === "playful" ? Math.sin(t * 3) * 0.6 : 0)) * (1 - Math.exp(-4 * dt));
@@ -328,11 +395,15 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     st.pet += ((st.mode === "petting" ? 1 : 0) - st.pet) * (1 - Math.exp(-5 * dt));
     petInfo.pet = st.pet;
     hero.petting = st.pet;
+    const rearT = st.mode === "chair" && (st.chairPh === 1 || st.chairPh === 2) ? 1 : 0;
+    st.rear += (rearT - st.rear) * (1 - Math.exp(-6 * dt));
+    const pushing = st.mode === "chair" && st.chairPh === 2 ? 1 : 0;
+    st.walk += dt * 9 * pushing;
     const rub = Math.sin(t * 3.2) * st.pet;
     body.current!.rotation.z = tilt + rub * 0.08;
-    body.current!.rotation.x = -st.pet * 0.42;
-    body.current!.position.y += st.pet * 0.05;
-    head.current!.rotation.x = headX + st.lie * 0.3 - st.pet * 0.55;
+    body.current!.rotation.x = -st.pet * 0.42 - st.rear * REAR_TILT;
+    body.current!.position.y += st.pet * 0.05 + st.rear * REAR_LIFT;
+    head.current!.rotation.x = headX + st.lie * 0.3 - st.pet * 0.55 + st.rear * 0.55;
     head.current!.rotation.z = tilt * 0.6 + (mood === "idle" ? Math.sin(t * 0.7) * 0.15 : 0) + rub * 0.3;
     head.current!.rotation.y = rub * 0.2;
     tail.current!.rotation.y = wag;
@@ -344,7 +415,10 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     eyes.current!.scale.y += ((eyeClosed ? 0.15 : 1) - eyes.current!.scale.y) * (1 - Math.exp(-15 * dt));
     if (tongue.current) tongue.current.visible = mood === "happy" || mood === "playful" || st.moving > 0.5;
     legs.current.forEach((leg, i) => {
-      if (leg) leg.rotation.x = Math.sin(st.walk + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.7 * st.moving - (i < 2 ? st.pet * 0.9 : 0);
+      if (!leg) return;
+      // встав на задние лапы, передние кладёт на спинку стула, задними переступает
+      const step = Math.sin(st.walk + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0));
+      leg.rotation.x = step * 0.7 * st.moving - (i < 2 ? st.pet * 0.9 + st.rear * 1.5 : 0) + (i > 1 ? step * 0.35 * pushing + st.rear * REAR_TILT : 0);
     });
   });
 
@@ -506,4 +580,4 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   );
 }
 
-if (import.meta.env.DEV) (window as unknown as { __pet: unknown }).__pet = { info: petInfo, cmd: petCmd, hero };
+if (import.meta.env.DEV) (window as unknown as { __pet: unknown }).__pet = { info: petInfo, cmd: petCmd, hero, props, link: petLink };

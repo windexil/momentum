@@ -7,6 +7,7 @@ import { CHAIR, DESK, FLOOR_LAMP, SIDE_TABLE } from "./Room";
 import { isEvening } from "./dayTime";
 import { props } from "./sceneState";
 import { nearestFree } from "./nav";
+import { petLink } from "./petLink";
 
 export type Pose = "stand" | "sit" | "lie" | "desk";
 export type HpLoc = "table" | "neck" | "head";
@@ -14,11 +15,15 @@ export type HpLoc = "table" | "neck" | "head";
 export type HpPlace = "side" | "desk" | "bed";
 
 export type Step =
-  | { k: "goto"; to: THREE.Vector3; face?: number; tol?: number }
+  | { k: "goto"; to: THREE.Vector3; face?: number; tol?: number; via?: THREE.Vector3[]; ignore?: string }
   | { k: "pose"; to: Pose }
   | { k: "hp"; to: HpLoc; place?: HpPlace }
   | { k: "drink" }
   | { k: "pull" }
+  /** выдвинуть (1) или задвинуть (0) стул у письменного стола */
+  | { k: "chair"; to: 0 | 1 }
+  /** мгновенное действие посреди очереди (не прерывает прослушивание) */
+  | { k: "cb"; fn: () => void }
   | { k: "do"; fn: () => void };
 
 export const SPOTS = {
@@ -46,8 +51,9 @@ export const SPOTS = {
 export const HP_PLACES: Record<HpPlace, { rest: THREE.Vector3; front: THREE.Vector3; face: number; yaw: number; reach: Pose | null; name: string }> = {
   side: { rest: SPOTS.hpRest, front: SPOTS.tableFront, face: 0, yaw: 0.4, reach: null, name: "на столик" },
   desk: {
-    rest: new THREE.Vector3(DESK.x + 0.5, 0.86, DESK.z + 0.18),
-    front: new THREE.Vector3(DESK.x + 0.55, 0, DESK.z + 0.85),
+    rest: new THREE.Vector3(DESK.x + 0.48, 0.86, DESK.z + 0.2),
+    // встаём в проход между столом и выдвинутым стулом
+    front: new THREE.Vector3(DESK.x + 0.3, 0, DESK.z + 0.68),
     face: Math.PI,
     yaw: -0.3,
     reach: "desk",
@@ -72,11 +78,37 @@ export const FACE = {
 };
 HP_PLACES.side.face = FACE.table;
 
+/** Точка у стола слева от стула, где проход к столешнице */
+const DESK_AISLE = new THREE.Vector3(DESK.x - 0.72, 0, DESK.z + 0.68);
+
 /** Дойти до места с наушниками (или ничего, если уже дотягиваемся). */
 function toPlace(place: HpPlace): Step[] {
   const pl = HP_PLACES[place];
   if (pl.reach && control.pose === pl.reach) return [];
+  if (place === "desk")
+    // к столу: подходим сбоку, отодвигаем стул и проходим к столешнице
+    return [
+      ...standFirst(),
+      { k: "goto", to: SPOTS.deskSide, face: FACE.desk },
+      { k: "chair", to: 1 },
+      { k: "goto", to: pl.front, face: pl.face, tol: 0.05, via: [DESK_AISLE], ignore: "desk" },
+    ];
   return [...standFirst(), { k: "goto", to: pl.front, face: pl.face, tol: 0.08 }];
+}
+
+/** Отойти от стола после того, как взяли/положили наушники. Стул задвигает питомец, а если его нет — сам персонаж. */
+function fromPlace(place: HpPlace, near: boolean): Step[] {
+  if (place !== "desk" || near) return [];
+  return [
+    { k: "goto", to: SPOTS.deskSide, face: FACE.desk, tol: 0.06, via: [DESK_AISLE], ignore: "desk" },
+    ...chairBack(),
+  ];
+}
+
+/** Задвинуть стул: зовём питомца, без питомца — сами. */
+export function chairBack(): Step[] {
+  if (petLink.available()) return [{ k: "cb", fn: () => petLink.pushChair() }];
+  return [{ k: "chair", to: 0 }];
 }
 
 /** Состояние, которое видит интерфейс (кнопки действий). */
@@ -158,6 +190,10 @@ export const heroCmd = {
   stand() {
     setQueue(standFirst());
   },
+  /** Подойти к столу и задвинуть выдвинутый стул самому. */
+  pushChair() {
+    setQueue([...standFirst(), { k: "goto", to: SPOTS.deskSide, face: FACE.desk }, { k: "chair", to: 0 }]);
+  },
   takeHp(thenWear = false) {
     if (control.hp !== "table") {
       if (thenWear) setQueue([{ k: "hp", to: "head" }]);
@@ -165,7 +201,7 @@ export const heroCmd = {
     }
     const back = control.pose;
     const near = toPlace(control.hpPlace).length === 0;
-    const steps: Step[] = [...toPlace(control.hpPlace), { k: "hp", to: "neck" }];
+    const steps: Step[] = [...toPlace(control.hpPlace), { k: "hp", to: "neck" }, ...fromPlace(control.hpPlace, near)];
     // если сидели или лежали — возвращаемся туда же
     if (!near) steps.push(...backTo(back));
     if (thenWear) steps.push({ k: "hp", to: "head" });
@@ -181,10 +217,12 @@ export const heroCmd = {
   /** Положить наушники: на столик, на письменный стол или на кровать. */
   putBackHp(place: HpPlace = control.hpPlace) {
     if (control.hp === "table") return;
+    const near = toPlace(place).length === 0;
     setQueue([
       ...(control.hp === "head" ? [{ k: "hp", to: "neck" } as Step] : []),
       ...toPlace(place),
       { k: "hp", to: "table", place },
+      ...fromPlace(place, near),
     ]);
   },
   /** Подготовка к прослушиванию воспоминания; onReady вызывается, когда наушники на голове. */
@@ -196,7 +234,7 @@ export const heroCmd = {
     const steps: Step[] = [];
     if (control.hp === "table") {
       const near = toPlace(control.hpPlace).length === 0;
-      steps.push(...toPlace(control.hpPlace), { k: "hp", to: "neck" });
+      steps.push(...toPlace(control.hpPlace), { k: "hp", to: "neck" }, ...fromPlace(control.hpPlace, near));
       // классический сценарий из плана: идём в кресло, садимся (или остаёмся, где были)
       if (!near) steps.push(...backTo(control.pose === "lie" || control.pose === "desk" ? control.pose : "sit"));
     } else if (control.pose === "stand") {
