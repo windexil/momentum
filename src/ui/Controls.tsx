@@ -2,7 +2,7 @@
 // Ходьба только кликом или тапом по полу.
 
 import { useEffect, useState } from "react";
-import { heroCmd, useHeroUI } from "../scene/heroControl";
+import { HP_PLACES, heroCmd, useHeroUI } from "../scene/heroControl";
 import { useStore } from "../store";
 import { useAvatar } from "../avatar";
 import { petCmd } from "../scene/Pet";
@@ -13,6 +13,8 @@ export function ActionBar() {
   const stop = useStore((s) => s.stopReliving);
   const listening = phase === "listening";
   const hasPet = useAvatar((s) => s.avatar.pet !== "none");
+  // кладём туда, где персонаж сейчас: за столом — на стол, в кровати — на кровать
+  const near = pose === "desk" ? "desk" : pose === "lie" ? "bed" : "side";
 
   return (
     <div className="actions">
@@ -28,7 +30,9 @@ export function ActionBar() {
       {hp === "head" && (
         <button onClick={() => (listening ? stop() : heroCmd.removeHp())}>🎧 Снять</button>
       )}
-      {hp !== "table" && !listening && <button onClick={() => heroCmd.putBackHp()}>↩ Положить на столик</button>}
+      {hp !== "table" && !listening && (
+        <button onClick={() => heroCmd.putBackHp(near)}>↩ Положить {HP_PLACES[near].name}</button>
+      )}
     </div>
   );
 }

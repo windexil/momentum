@@ -10,11 +10,13 @@ import { nearestFree } from "./nav";
 
 export type Pose = "stand" | "sit" | "lie" | "desk";
 export type HpLoc = "table" | "neck" | "head";
+/** Куда можно положить наушники */
+export type HpPlace = "side" | "desk" | "bed";
 
 export type Step =
   | { k: "goto"; to: THREE.Vector3; face?: number; tol?: number }
   | { k: "pose"; to: Pose }
-  | { k: "hp"; to: HpLoc }
+  | { k: "hp"; to: HpLoc; place?: HpPlace }
   | { k: "drink" }
   | { k: "pull" }
   | { k: "do"; fn: () => void };
@@ -36,6 +38,31 @@ export const SPOTS = {
   deskSide: new THREE.Vector3(DESK.x - 0.72, 0, DESK.z + 1.4),
 };
 
+/**
+ * Места для наушников: где они лежат (rest), где встаёт персонаж (front),
+ * куда он смотрит (face), поворот наушников (yaw) и поза, из которой
+ * до них можно дотянуться без ходьбы (reach).
+ */
+export const HP_PLACES: Record<HpPlace, { rest: THREE.Vector3; front: THREE.Vector3; face: number; yaw: number; reach: Pose | null; name: string }> = {
+  side: { rest: SPOTS.hpRest, front: SPOTS.tableFront, face: 0, yaw: 0.4, reach: null, name: "на столик" },
+  desk: {
+    rest: new THREE.Vector3(DESK.x + 0.5, 0.86, DESK.z + 0.18),
+    front: new THREE.Vector3(DESK.x + 0.55, 0, DESK.z + 0.85),
+    face: Math.PI,
+    yaw: -0.3,
+    reach: "desk",
+    name: "на стол",
+  },
+  bed: {
+    rest: new THREE.Vector3(-2.2, 0.855, -1.2),
+    front: new THREE.Vector3(-1.45, 0, -1.2),
+    face: -Math.PI / 2,
+    yaw: 1.1,
+    reach: "lie",
+    name: "на кровать",
+  },
+};
+
 export const FACE = {
   desk: Math.PI / 2, // лицом к стулу, потом разворот к столу
   lamp: -Math.PI / 2 + 0.1,
@@ -43,20 +70,32 @@ export const FACE = {
   bed: Math.PI / 2, // спиной к кровати: сначала садимся на край
   table: Math.atan2(SIDE_TABLE.x - SPOTS.tableFront.x, SIDE_TABLE.z - SPOTS.tableFront.z),
 };
+HP_PLACES.side.face = FACE.table;
+
+/** Дойти до места с наушниками (или ничего, если уже дотягиваемся). */
+function toPlace(place: HpPlace): Step[] {
+  const pl = HP_PLACES[place];
+  if (pl.reach && control.pose === pl.reach) return [];
+  return [...standFirst(), { k: "goto", to: pl.front, face: pl.face, tol: 0.08 }];
+}
 
 /** Состояние, которое видит интерфейс (кнопки действий). */
 interface HeroUI {
   pose: Pose;
   hp: HpLoc;
   busy: boolean;
+  /** где лежат наушники, когда они не у персонажа */
+  place: HpPlace;
 }
-export const useHeroUI = create<HeroUI>(() => ({ pose: "stand", hp: "table", busy: false }));
+export const useHeroUI = create<HeroUI>(() => ({ pose: "stand", hp: "table", busy: false, place: "side" }));
 
 export const control = {
   queue: [] as Step[],
   /** Желаемая поза и положение наушников (то, к чему стремится персонаж) */
   pose: "stand" as Pose,
   hp: "table" as HpLoc,
+  /** Где лежат (или будут лежать) наушники */
+  hpPlace: "side" as HpPlace,
   /** Вызывается, когда новая команда прервала подготовку к прослушиванию */
   onInterrupt: null as null | (() => void),
 };
@@ -125,13 +164,10 @@ export const heroCmd = {
       return;
     }
     const back = control.pose;
-    const steps: Step[] = [
-      ...standFirst(),
-      { k: "goto", to: SPOTS.tableFront, face: FACE.table },
-      { k: "hp", to: "neck" },
-    ];
+    const near = toPlace(control.hpPlace).length === 0;
+    const steps: Step[] = [...toPlace(control.hpPlace), { k: "hp", to: "neck" }];
     // если сидели или лежали — возвращаемся туда же
-    steps.push(...backTo(back));
+    if (!near) steps.push(...backTo(back));
     if (thenWear) steps.push({ k: "hp", to: "head" });
     setQueue(steps);
   },
@@ -142,12 +178,13 @@ export const heroCmd = {
   removeHp() {
     setQueue([{ k: "hp", to: "neck" }]);
   },
-  putBackHp() {
+  /** Положить наушники: на столик, на письменный стол или на кровать. */
+  putBackHp(place: HpPlace = control.hpPlace) {
+    if (control.hp === "table") return;
     setQueue([
       ...(control.hp === "head" ? [{ k: "hp", to: "neck" } as Step] : []),
-      ...standFirst(),
-      { k: "goto", to: SPOTS.tableFront, face: FACE.table },
-      { k: "hp", to: "table" },
+      ...toPlace(place),
+      { k: "hp", to: "table", place },
     ]);
   },
   /** Подготовка к прослушиванию воспоминания; onReady вызывается, когда наушники на голове. */
@@ -158,9 +195,10 @@ export const heroCmd = {
     }
     const steps: Step[] = [];
     if (control.hp === "table") {
-      steps.push(...standFirst(), { k: "goto", to: SPOTS.tableFront, face: FACE.table }, { k: "hp", to: "neck" });
-      // классический сценарий из плана: идём в кресло, садимся
-      steps.push(...backTo(control.pose === "lie" || control.pose === "desk" ? control.pose : "sit"));
+      const near = toPlace(control.hpPlace).length === 0;
+      steps.push(...toPlace(control.hpPlace), { k: "hp", to: "neck" });
+      // классический сценарий из плана: идём в кресло, садимся (или остаёмся, где были)
+      if (!near) steps.push(...backTo(control.pose === "lie" || control.pose === "desk" ? control.pose : "sit"));
     } else if (control.pose === "stand") {
       steps.push({ k: "goto", to: SPOTS.chairFront, face: FACE.chair }, { k: "pose", to: "sit" });
     }
@@ -176,3 +214,4 @@ export const heroCmd = {
     return s;
   },
 };
+if (import.meta.env.DEV) (window as unknown as { __hero: unknown }).__hero = { heroCmd, control };

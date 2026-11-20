@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { moodOf, useAvatar, type Mood } from "../avatar";
 import { useStore } from "../store";
 import { Waveform } from "./SoundFx";
-import { control, heroCmd, SPOTS, useHeroUI, type Pose } from "./heroControl";
+import { control, heroCmd, HP_PLACES, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
 import { DESK } from "./Room";
 import { props } from "./sceneState";
@@ -103,6 +103,9 @@ export function Character() {
       onHead: 0, // 0 — на шее, 1 — на голове
       hold: 0,
       settle: 0, // «устроился поудобнее» после надевания
+      beat: Math.PI * 2, // темп покачивания (сглаженный)
+      beatPh: 0, // накопленная фаза покачивания
+      lvl: 0, // сглаженная громкость
       blink: 0,
       nextBlink: 2,
       stuck: 0,
@@ -114,6 +117,7 @@ export function Character() {
       unwinding: false,
       uiPose: "stand" as Pose,
       uiHp: "table" as string,
+      uiPlace: "side" as string,
     }),
     [],
   );
@@ -282,6 +286,10 @@ export function Character() {
         }
       } else if (step.k === "hp") {
         control.hp = step.to;
+        if (step.to === "table" && step.place && control.hpPlace !== step.place) {
+          control.hpPlace = step.place;
+          tmp.restQ.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, HP_PLACES[step.place].yaw));
+        }
         const c = step.to === "table" ? 0 : 1, h = step.to === "head" ? 1 : 0;
         if (Math.abs(st.carry - c) < 0.001 && Math.abs(st.onHead - h) < 0.001) heroCmd.shift();
       } else {
@@ -378,14 +386,18 @@ export function Character() {
     // Поза тела
     const swing = Math.sin(st.walk) * 0.6 * moveAmt;
     const breathe = Math.sin(t * 1.8) * 0.01;
-    const beat = Math.PI * 2 * (0.8 + live.animSpeed * 0.6);
+    // Темп и громкость сглаживаем: громкость музыки скачет каждый кадр,
+    // а фазу копим по шагам — иначе при смене темпа sin(t·темп) прыгает и персонажа трясёт.
+    st.beat = damp(st.beat, Math.PI * 2 * (0.7 + live.animSpeed * 0.35), 0.8, dt);
+    st.lvl = damp(st.lvl, live.level, 2.5, dt);
+    st.beatPh += dt * st.beat;
     // покачивание нарастает плавно, а не включается рывком
     st.settle = damp(st.settle, listening ? 1 : 0, 1.5, dt);
-    const groove = Math.sin(t * beat) * (0.05 + live.level * 0.14) * st.settle;
+    const groove = Math.sin(st.beatPh) * (0.035 + st.lvl * 0.07) * st.settle;
 
     body.current!.position.y = chairLift + Math.abs(Math.sin(st.walk)) * 0.05 * moveAmt + breathe * (1 - lieE);
     body.current!.rotation.z = groove * 0.35 * (1 - lieE);
-    const dangle = Math.sin(t * beat * 0.5) * 0.25 * st.settle * legBend;
+    const dangle = Math.sin(st.beatPh * 0.5) * 0.2 * st.settle * legBend;
     // лёжа одна нога чуть согнута — поза отдыха
     const restKnee = 0.35 * lieB;
     thighL.current!.rotation.x = swing * (1 - legBend) - (Math.PI / 2) * legBend - restKnee * 0.5;
@@ -457,7 +469,7 @@ export function Character() {
     smile.current!.visible = mood === "happy" || mood === "sleepy";
     frown.current!.visible = mood === "sad";
     openMouth.current!.visible = mood === "playful";
-    openMouth.current!.scale.y = 0.8 + live.level * 0.8;
+    openMouth.current!.scale.y = 0.8 + st.lvl * 0.8;
 
     // ---- Наушники: столик → шея → голова (по дуге) ----
     headAnchor.current!.getWorldPosition(tmp.headW);
@@ -470,7 +482,7 @@ export function Character() {
     tmp.carryQ.slerpQuaternions(tmp.neckQ, tmp.headQ, onHeadE);
     const carryE = smoother(st.carry);
     const hp = headphones.current!;
-    hp.position.lerpVectors(SPOTS.hpRest, tmp.carryP, carryE);
+    hp.position.lerpVectors(HP_PLACES[control.hpPlace].rest, tmp.carryP, carryE);
     hp.position.y += Math.sin(st.carry * Math.PI) * 0.3;
     hp.quaternion.slerpQuaternions(tmp.restQ, tmp.carryQ, carryE);
     hp.scale.setScalar(THREE.MathUtils.lerp(0.75, THREE.MathUtils.lerp(0.95, 1, onHeadE), carryE));
@@ -495,10 +507,11 @@ export function Character() {
 
     // ---- Состояние для кнопок интерфейса ----
     const uiHp = control.hp;
-    if (st.uiPose !== control.pose || st.uiHp !== uiHp) {
+    if (st.uiPose !== control.pose || st.uiHp !== uiHp || st.uiPlace !== control.hpPlace) {
       st.uiPose = control.pose;
       st.uiHp = uiHp;
-      useHeroUI.setState({ pose: control.pose, hp: uiHp });
+      st.uiPlace = control.hpPlace;
+      useHeroUI.setState({ pose: control.pose, hp: uiHp, place: control.hpPlace });
     }
   });
 

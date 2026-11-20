@@ -3,11 +3,12 @@
 // Плюс камера, которая следует за персонажем.
 
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Html } from "@react-three/drei";
 import { useStore } from "../store";
 import * as THREE from "three";
 import { hero } from "./Character";
-import { control, heroCmd } from "./heroControl";
+import { control, heroCmd, HP_PLACES, useHeroUI, type HpPlace } from "./heroControl";
 import { CHAIR, DESK, FLOOR_LAMP, ROOM, ROOM_X, ROOM_Z, SIDE_TABLE } from "./Room";
 
 const ghost = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
@@ -52,6 +53,29 @@ export function Interact() {
   });
   const target = useRef<THREE.Vector3 | null>(null);
 
+  // Меню у мебели: если наушники у персонажа, можно положить их сюда
+  const [menu, setMenu] = useState<null | { at: THREE.Vector3; place: HpPlace; label: string; fn: () => void }>(null);
+  const place = useHeroUI((s) => s.place);
+  const hpLoc = useHeroUI((s) => s.hp);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest?.(".place-menu")) setMenu(null);
+    };
+    const id = setTimeout(() => window.addEventListener("pointerdown", close), 0);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("pointerdown", close);
+    };
+  }, [menu]);
+  /** Клик по мебели: обычное действие, а с наушниками на шее/голове — выбор. */
+  const surface = (pl: HpPlace, label: string, fn: () => void) =>
+    tap((e) => {
+      if (control.hp === "table") return fn();
+      setMenu({ at: e.point.clone().setY(e.point.y + 0.25), place: pl, label, fn });
+    });
+  const hpTap = tap(() => (control.hp === "table" ? heroCmd.takeHp() : control.hp === "neck" ? heroCmd.wearHp() : heroCmd.removeHp()));
+
   return (
     <group>
       <mesh
@@ -76,18 +100,24 @@ export function Interact() {
       <mesh position={[CHAIR.x, 0.55, CHAIR.z]} rotation-y={CHAIR.rot} material={ghost} onClick={tap(() => heroCmd.sit())} {...hover}>
         <boxGeometry args={[1.2, 1.1, 1.1]} />
       </mesh>
-      <mesh position={[-2.85, 0.5, -2.3]} material={ghost} onClick={tap(() => heroCmd.lie())} {...hover}>
+      <mesh position={[-2.85, 0.5, -2.3]} material={ghost} onClick={surface("bed", "🛏 Лечь", () => heroCmd.lie())} {...hover}>
         <boxGeometry args={[1.95, 1.0, 3.1]} />
       </mesh>
-      {/* столик: наушники и кружка какао */}
+      {/* столик: положить наушники или попить какао */}
       <mesh
         position={[SIDE_TABLE.x - 0.06, 0.66, SIDE_TABLE.z - 0.1]}
         material={ghost}
-        onClick={tap(() => (control.hp === "table" ? heroCmd.takeHp() : control.hp === "neck" ? heroCmd.wearHp() : heroCmd.removeHp()))}
+        onClick={surface("side", "☕ Попить какао", () => heroCmd.drink())}
         {...hover}
       >
         <boxGeometry args={[0.5, 0.22, 0.38]} />
       </mesh>
+      {/* сами наушники там, где лежат: взять */}
+      {hpLoc === "table" && (
+        <mesh position={HP_PLACES[place].rest} material={ghost} onClick={hpTap} {...hover}>
+          <boxGeometry args={[0.36, 0.26, 0.36]} />
+        </mesh>
+      )}
       <mesh position={[SIDE_TABLE.x + 0.15, 0.68, SIDE_TABLE.z + 0.14]} material={ghost} onClick={tap(() => heroCmd.drink())} {...hover}>
         <boxGeometry args={[0.2, 0.2, 0.2]} />
       </mesh>
@@ -99,9 +129,35 @@ export function Interact() {
       <mesh position={[DESK.x - 0.1, 0.5, DESK.z + 0.75]} material={ghost} onClick={tap(() => heroCmd.desk())} {...hover}>
         <boxGeometry args={[0.6, 1.0, 0.6]} />
       </mesh>
-      <mesh position={[DESK.x, 0.36, DESK.z]} material={ghost} onClick={tap(() => heroCmd.desk())}>
+      <mesh position={[DESK.x, 0.36, DESK.z]} material={ghost} onClick={surface("desk", "✍️ Сесть за стол", () => heroCmd.desk())}>
         <boxGeometry args={[2.0, 0.72, 0.85]} />
       </mesh>
+      {/* столешница: сюда тоже можно положить наушники */}
+      <mesh position={[DESK.x + 0.55, 0.82, DESK.z + 0.15]} material={ghost} onClick={surface("desk", "✍️ Сесть за стол", () => heroCmd.desk())} {...hover}>
+        <boxGeometry args={[0.8, 0.06, 0.5]} />
+      </mesh>
+      {menu && (
+        <Html position={menu.at} center zIndexRange={[40, 30]}>
+          <div className="pet-menu place-menu" onPointerDown={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => {
+                heroCmd.putBackHp(menu.place);
+                setMenu(null);
+              }}
+            >
+              🎧 Положить наушники {HP_PLACES[menu.place].name}
+            </button>
+            <button
+              onClick={() => {
+                menu.fn();
+                setMenu(null);
+              }}
+            >
+              {menu.label}
+            </button>
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
