@@ -6,6 +6,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { sfx } from "../audio/roomSfx";
+import { useAvatar } from "../avatar";
 import { useRoom } from "../roomStore";
 import { hero } from "./Character";
 import { petInfo } from "./Pet";
@@ -19,6 +20,7 @@ const rel = new THREE.Vector3();
 
 export function RoomSounds() {
   const camera = useThree((s) => s.camera);
+  const kind = useAvatar((s) => s.avatar.pet);
   const st = useRef({
     stepIdx: 0,
     sec: -1,
@@ -27,7 +29,7 @@ export function RoomSounds() {
     lie: 0,
     desk: 0,
     mode: "",
-    nextMeow: 25 + Math.random() * 30,
+    nextMeow: 40 + Math.random() * 40,
   });
 
   /** громкость и панорама для точки в комнате */
@@ -59,7 +61,7 @@ export function RoomSounds() {
       s.stepIdx = idx;
       if (hero.moveAmt > 0.15 && hero.sit < 0.1 && hero.lie < 0.1) {
         const onRug = Math.hypot(hero.pos.x - CHAIR.x - 0.2, hero.pos.z - CHAIR.z - 0.2) < RUG_R;
-        const [v, pan] = place(hero.pos, 0.55 * (0.5 + hero.moveAmt * 0.5));
+        const [v, pan] = place(hero.pos, 0.8 * (0.5 + hero.moveAmt * 0.5));
         sfx.step(onRug, v, pan + (idx % 2 ? 0.08 : -0.08));
       }
     }
@@ -68,7 +70,7 @@ export function RoomSounds() {
     const sec = Math.floor(performance.now() / 1000);
     if (sec !== s.sec) {
       s.sec = sec;
-      const [v, pan] = place(CLOCK, 0.16, 0.35);
+      const [v, pan] = place(CLOCK, 0.3, 0.35);
       sfx.tick(sec % 2 === 1, v, pan);
     }
 
@@ -89,26 +91,25 @@ export function RoomSounds() {
     s.desk = hero.desk;
     s.lie = hero.lie;
 
-    // ---- кот
-    if (petInfo.present) {
-      const [cv, cpan] = place(petInfo.pos, 0.7, 0.45);
+    // ---- питомец: у кота, собаки и кролика свои голоса
+    if (petInfo.present && kind !== "none") {
+      const [cv, cpan] = place(petInfo.pos, 0.55, 0.45);
       if (petInfo.mode !== s.mode) {
         const was = s.mode;
         s.mode = petInfo.mode;
         if (was) {
-          if (petInfo.mode === "called") sfx.meow("meow", cv, cpan);
-          else if (petInfo.mode === "petting") sfx.meow("trill", cv * 0.8, cpan);
-          else if (petInfo.mode === "petWait") sfx.meow("mew", cv * 0.8, cpan);
+          if (petInfo.mode === "called") sfx.petVoice(kind, "call", cv, cpan);
+          else if (petInfo.mode === "petting") sfx.petVoice(kind, "greet", cv * 0.8, cpan);
         }
       }
-      // иногда мяукает сам по себе (но не во сне)
+      // изредка подаёт голос сам (но не во сне и не когда гладят)
       s.nextMeow -= dt;
       if (s.nextMeow <= 0) {
-        s.nextMeow = 40 + Math.random() * 60;
-        if (petInfo.mode !== "nap" && petInfo.mode !== "petting") sfx.meow(Math.random() < 0.6 ? "mew" : "meow", cv * 0.8, cpan);
+        s.nextMeow = 70 + Math.random() * 80;
+        if (petInfo.mode !== "nap" && petInfo.mode !== "petting") sfx.petVoice(kind, "idle", cv * 0.7, cpan);
       }
-      // мурчит, пока гладят (и ещё немного после)
-      sfx.setPurr(petInfo.pet * cv, cpan, performance.now() / 1000);
+      // мурчит / довольно дышит, пока гладят
+      sfx.setContent(kind, petInfo.pet * cv, cpan);
     }
   });
 
