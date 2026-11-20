@@ -29,6 +29,8 @@ export const hero = {
   firstPerson: false,
   moving: false,
   listening: false,
+  /** 0..1 — персонаж гладит питомца (рука тянется вниз) */
+  petting: 0,
 };
 
 // Пропорции чиби
@@ -420,7 +422,8 @@ export function Character() {
     foreR.current!.rotation.x = (-reaching * 0.9 - elbow * 1.35 - rest * 1.2) * freeR - reachMug * 0.3 - sip * 1.85 - (grab - sip) * 0.9;
     foreL.current!.rotation.z = -h * 1.6 + elbow * 0.45 + rest * 0.6;
     foreR.current!.rotation.z = (h * 1.6 - elbow * 0.45 - rest * 0.6) * freeR - sip * 0.35;
-    armR.current!.rotation.x += -raise * 2.6 + tug * 0.5;
+    armR.current!.rotation.x += -raise * 2.6 + tug * 0.5 - hero.petting * (1.15 + Math.sin(t * 5) * 0.18);
+    foreR.current!.rotation.x += -hero.petting * 0.35;
     armR.current!.rotation.z += raise * 0.25;
     foreR.current!.rotation.x += -raise * 0.25;
     // стул и стол: обе руки вперёд

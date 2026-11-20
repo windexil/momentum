@@ -80,6 +80,10 @@ function setQueue(steps: Step[]) {
 }
 
 export const heroCmd = {
+  /** Подойти к точке и встать лицом в заданную сторону (например, к питомцу). */
+  approach(p: THREE.Vector3, face: number) {
+    setQueue([...standFirst(), { k: "goto", to: nearestFree(p.x, p.z, 0.22), tol: 0.08, face }]);
+  },
   walkTo(p: THREE.Vector3) {
     setQueue([...standFirst(), { k: "goto", to: nearestFree(p.x, p.z, 0.22), tol: 0.08 }]);
   },

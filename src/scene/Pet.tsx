@@ -29,11 +29,20 @@ export const petCmd = {
     const dir = new THREE.Vector3().subVectors(hero.pos, p).setY(0);
     if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
     dir.normalize();
-    const spot = p.clone().addScaledVector(dir, 0.5);
-    heroCmd.walkTo(spot);
+    const spot = p.clone().addScaledVector(dir, 0.48);
+    // встаём лицом к питомцу
+    heroCmd.approach(spot, Math.atan2(-dir.x, -dir.z));
   },
 };
 
+/** Случайная точка не слишком близко к текущей — чтобы прогулка была заметной */
+function randomSpotFrom(from: THREE.Vector3) {
+  for (let i = 0; i < 8; i++) {
+    const p = randomSpot();
+    if (p.distanceTo(from) > 1.6) return p;
+  }
+  return randomSpot();
+}
 const randomSpot = () =>
   nearestFree(
     THREE.MathUtils.lerp(BOUNDS.min + 0.5, BOUNDS.max - 0.5, Math.random()),
@@ -119,7 +128,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
       path: [] as THREE.Vector3[], planGoal: new THREE.Vector3(999, 0, 999), planT: 0,
       // своя жизнь: гуляет, отдыхает, дремлет; приходит, когда зовут
       mode: "rest" as "wander" | "rest" | "nap" | "called" | "petWait" | "petting",
-      modeT: 2, wander: new THREE.Vector3(), here: new THREE.Vector3(), arrivedT: 0,
+      modeT: 1, pet: 0, wander: new THREE.Vector3(), here: new THREE.Vector3(), arrivedT: 0,
     }),
     [],
   );
@@ -207,9 +216,15 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
           goal = st.wander;
           tol = 0.15;
           if (st.pos.distanceTo(st.wander) < 0.2 || st.modeT <= 0) {
+            // чаще всего сразу идёт дальше; иногда принюхивается или дремлет
             const roll = Math.random();
-            st.mode = roll < 0.25 ? "nap" : "rest";
-            st.modeT = st.mode === "nap" ? 12 + Math.random() * 12 : 3 + Math.random() * 6;
+            if (roll < 0.72) {
+              st.wander.copy(randomSpotFrom(st.pos));
+              st.modeT = 15;
+            } else {
+              st.mode = roll < 0.93 ? "rest" : "nap";
+              st.modeT = st.mode === "nap" ? 10 + Math.random() * 10 : 1.2 + Math.random() * 2;
+            }
           }
           break;
         default:
@@ -219,7 +234,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
           if (st.modeT <= 0) {
             // иногда подходит к хозяину сам, чаще — в случайное место
             if (Math.random() < 0.25) st.here.set(0, 0, 0.7).applyAxisAngle(THREE.Object3D.DEFAULT_UP, hero.rot).add(hero.pos), st.wander.copy(nearestFree(st.here.x, st.here.z, PET_R));
-            else st.wander.copy(randomSpot());
+            else st.wander.copy(randomSpotFrom(st.pos));
             st.mode = "wander";
             st.modeT = 15;
           }
@@ -245,7 +260,8 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
         const wp = st.path[0] ?? goal;
         tmp.d.subVectors(wp, st.pos).setY(0);
         const wdist = Math.max(0.0001, tmp.d.length());
-        const speed = Math.min(2.4, 0.9 + dist * 1.4);
+        // гуляет неспешно, а на зов бежит
+        const speed = st.mode === "wander" && !wantBed && !nearChair ? 0.62 : Math.min(2.4, 0.9 + dist * 1.4);
         st.rot += angleTo(st.rot, Math.atan2(tmp.d.x, tmp.d.z)) * (1 - Math.exp(-8 * dt));
         tmp.d.normalize().multiplyScalar(Math.min(wdist, speed * dt));
         moveWithCollision(st.pos, tmp.d.x, tmp.d.z, PET_R);
@@ -268,7 +284,10 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     const beat = t * Math.PI * 2 * (0.8 + live.animSpeed * 0.6);
     let hop = 0, wag = Math.sin(t * 2) * 0.3, headX = 0, earDroop = 0, tilt = 0;
     const still = !moving && (st.onBed === 0 || st.onBed === 1);
-    if (still) {
+    if (still && st.mode === "petting") {
+      // мурчит: хвост медленно ходит, без подпрыгиваний
+      wag = Math.sin(t * 2.4) * 0.45;
+    } else if (still) {
       if (mood === "happy") {
         hop = Math.abs(Math.sin(beat * 0.5)) * (0.05 + live.level * 0.08);
         wag = Math.sin(t * 14) * 0.6;
@@ -297,9 +316,16 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     r.rotation.y = st.rot;
     body.current!.scale.set(1 + st.lie * 0.1, 1 - st.lie * 0.28 + Math.sin(t * (st.lie > 0.5 ? 1.2 : 2.5)) * 0.02, 1);
     body.current!.position.y = -st.lie * 0.06 + Math.abs(Math.sin(st.walk)) * 0.035 * st.moving;
-    body.current!.rotation.z = tilt;
-    head.current!.rotation.x = headX + st.lie * 0.3;
-    head.current!.rotation.z = tilt * 0.6 + (mood === "idle" ? Math.sin(t * 0.7) * 0.15 : 0);
+    // когда гладят — привстаёт на задние лапы и тянется головой к руке
+    st.pet += ((st.mode === "petting" ? 1 : 0) - st.pet) * (1 - Math.exp(-5 * dt));
+    hero.petting = st.pet;
+    const rub = Math.sin(t * 3.2) * st.pet;
+    body.current!.rotation.z = tilt + rub * 0.08;
+    body.current!.rotation.x = -st.pet * 0.42;
+    body.current!.position.y += st.pet * 0.05;
+    head.current!.rotation.x = headX + st.lie * 0.3 - st.pet * 0.55;
+    head.current!.rotation.z = tilt * 0.6 + (mood === "idle" ? Math.sin(t * 0.7) * 0.15 : 0) + rub * 0.3;
+    head.current!.rotation.y = rub * 0.2;
     tail.current!.rotation.y = wag;
     const droopBase = kind === "dog" ? 0.2 : 0;
     earL.current!.rotation.z = 0.2 + earDroop * 0.8 + droopBase + (kind === "dog" ? Math.sin(st.walk) * 0.2 * st.moving : 0);
@@ -309,7 +335,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
     eyes.current!.scale.y += ((eyeClosed ? 0.15 : 1) - eyes.current!.scale.y) * (1 - Math.exp(-15 * dt));
     if (tongue.current) tongue.current.visible = mood === "happy" || mood === "playful" || st.moving > 0.5;
     legs.current.forEach((leg, i) => {
-      if (leg) leg.rotation.x = Math.sin(st.walk + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.7 * st.moving;
+      if (leg) leg.rotation.x = Math.sin(st.walk + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.7 * st.moving - (i < 2 ? st.pet * 0.9 : 0);
     });
   });
 
