@@ -7,6 +7,7 @@ import { useFrame } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { mergeStatic } from "./staticMerge";
+import { KittenFigurine } from "./KittenFigurine";
 import * as THREE from "three";
 import { live } from "./live";
 import { props } from "./sceneState";
@@ -271,8 +272,8 @@ function Desk({ mats }: { mats: Mats }) {
       </mesh>
       {/* книги стоят рядком между двумя подпорками, корешками в комнату */}
       <DeskBooks mats={mats} />
-      {/* фигурка ворчливого кота слева от лампы */}
-      <DeskCat position={[0.64, 0.795, -0.27]} />
+      {/* фигурка котёнка в наушниках слева от лампы */}
+      <KittenFigurine position={[0.64, 0.795, -0.27]} />
       {/* стул: выдвигается, когда персонаж садится за стол */}
       <DeskChair mats={mats} />
     </group>
@@ -317,96 +318,6 @@ function DeskBooks({ mats }: { mats: Mats }) {
       {end(-0.94)}
       {row}
       {end(x + 0.03)}
-    </group>
-  );
-}
-
-/** Маленькая керамическая фигурка сидящего хмурого кота. */
-function DeskCat({ position }: { position: [number, number, number] }) {
-  const m = useMemo(() => {
-    const glaze = (color: string, rough = 0.3) =>
-      new THREE.MeshPhysicalMaterial({ color, roughness: rough, clearcoat: 0.8, clearcoatRoughness: 0.25 });
-    return {
-      cream: glaze("#efe2cc"),
-      mask: glaze("#5b4232"),
-      pink: glaze("#d99a95"),
-      eye: glaze("#7fb6e6", 0.15),
-      dark: glaze("#201814", 0.4),
-      base: new THREE.MeshStandardMaterial({ color: "#3e2b1e", roughness: 0.5 }),
-    };
-  }, []);
-  return (
-    <group position={position} rotation-y={-0.35}>
-      <mesh position={[0, 0.006, 0]} castShadow receiveShadow material={m.base}>
-        <cylinderGeometry args={[0.065, 0.068, 0.012, 28]} />
-      </mesh>
-      <group position={[0, 0.012, 0]}>
-        {/* туловище «грушей» */}
-        <mesh position={[0, 0.05, -0.005]} scale={[1, 1.12, 0.92]} castShadow material={m.cream}>
-          <sphereGeometry args={[0.05, 24, 18]} />
-        </mesh>
-        {/* передние лапки */}
-        {[-1, 1].map((sx) => (
-          <mesh key={sx} position={[sx * 0.019, 0.012, 0.036]} scale={[1, 0.8, 1.35]} castShadow material={m.cream}>
-            <sphereGeometry args={[0.013, 14, 10]} />
-          </mesh>
-        ))}
-        {/* хвост обвивает лапы */}
-        <mesh position={[0, 0.01, 0]} rotation={[Math.PI / 2, 0, -0.4]} castShadow material={m.mask}>
-          <torusGeometry args={[0.048, 0.008, 10, 28, Math.PI * 1.05]} />
-        </mesh>
-        {/* голова: широкая, чуть приплюснутая */}
-        <group position={[0, 0.122, 0.006]}>
-          <mesh scale={[1.18, 0.94, 0.96]} castShadow material={m.cream}>
-            <sphereGeometry args={[0.045, 26, 20]} />
-          </mesh>
-          {/* тёмная «маска» мордочки */}
-          <mesh position={[0, -0.002, 0.026]} scale={[1.35, 1.0, 0.62]} material={m.mask}>
-            <sphereGeometry args={[0.03, 22, 16]} />
-          </mesh>
-          {/* уши */}
-          {[-1, 1].map((sx) => (
-            <group key={sx} position={[sx * 0.031, 0.036, -0.004]} rotation-z={-sx * 0.38}>
-              <mesh castShadow material={m.mask}>
-                <coneGeometry args={[0.017, 0.032, 14]} />
-              </mesh>
-              <mesh position={[0, -0.002, 0.008]} scale={[0.6, 0.7, 0.4]} material={m.pink}>
-                <coneGeometry args={[0.017, 0.032, 12]} />
-              </mesh>
-            </group>
-          ))}
-          {/* щёчки и нос */}
-          {[-1, 1].map((sx) => (
-            <mesh key={sx} position={[sx * 0.009, -0.014, 0.043]} material={m.cream}>
-              <sphereGeometry args={[0.0105, 14, 10]} />
-            </mesh>
-          ))}
-          <mesh position={[0, -0.004, 0.048]} scale={[1.3, 0.8, 1]} material={m.pink}>
-            <sphereGeometry args={[0.005, 10, 8]} />
-          </mesh>
-          {/* светлый подбородок и хмурый рот «дугой вниз» */}
-          <mesh position={[0, -0.027, 0.034]} scale={[1.45, 0.75, 0.8]} material={m.cream}>
-            <sphereGeometry args={[0.012, 16, 12]} />
-          </mesh>
-          <mesh position={[0, -0.032, 0.0425]} rotation-x={-0.35} material={m.dark}>
-            <torusGeometry args={[0.0105, 0.0014, 6, 18, Math.PI]} />
-          </mesh>
-          {/* глаза с тяжёлыми веками: внутренние края опущены */}
-          {[-1, 1].map((sx) => (
-            <group key={sx} position={[sx * 0.019, 0.011, 0.039]}>
-              <mesh scale={[1, 0.75, 0.6]} material={m.eye}>
-                <sphereGeometry args={[0.0075, 14, 10]} />
-              </mesh>
-              <mesh position={[0, 0, 0.003]} scale={[0.35, 0.75, 0.4]} material={m.dark}>
-                <sphereGeometry args={[0.0075, 10, 8]} />
-              </mesh>
-              <mesh position={[0, 0.004, 0.002]} rotation-z={sx * 0.42} material={m.mask}>
-                <boxGeometry args={[0.02, 0.006, 0.008]} />
-              </mesh>
-            </group>
-          ))}
-        </group>
-      </group>
     </group>
   );
 }
