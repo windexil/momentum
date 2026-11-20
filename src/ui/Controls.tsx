@@ -15,6 +15,15 @@ export function ActionBar() {
   const hasPet = useAvatar((s) => s.avatar.pet !== "none");
   // кладём туда, где персонаж сейчас: за столом — на стол, в кровати — на кровать
   const near = pose === "lie" ? "bed" : "side";
+  const inRoom = useStore((s) => s.place === "room");
+
+  // в локации воспоминания одно действие: вернуться домой
+  if (!inRoom)
+    return (
+      <div className="actions">
+        <button onClick={() => stop()}>🏠 Вернуться в комнату</button>
+      </div>
+    );
 
   return (
     <div className="actions">

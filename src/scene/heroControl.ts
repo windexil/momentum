@@ -88,6 +88,8 @@ export const control = {
   hp: "table" as HpLoc,
   /** Где лежат (или будут лежать) наушники */
   hpPlace: "side" as HpPlace,
+  /** Мгновенно перенести персонажа (в локацию воспоминания и обратно) */
+  teleport: null as null | { pos: THREE.Vector3; rot: number },
   /** Вызывается, когда новая команда прервала подготовку к прослушиванию */
   onInterrupt: null as null | (() => void),
 };

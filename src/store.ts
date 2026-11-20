@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { NEUTRAL_ATMOSPHERE, type Atmosphere } from "./atmosphere/types";
+import { NEUTRAL_ATMOSPHERE, type Atmosphere, type Place } from "./atmosphere/types";
+import { detectPlace } from "./atmosphere/place";
 import { audio } from "./audio/engine";
 import { buildDemoMemories } from "./data/demo";
 import { deleteMemory, hasSeeded, loadMemories, markSeeded, saveMemory } from "./storage";
@@ -21,6 +22,8 @@ interface State {
   hint: string | null;
   /** Счётчик запросов «пережить день»: персонаж готовится к прослушиванию. */
   request: number;
+  /** Где сейчас персонаж: в комнате или в локации воспоминания */
+  place: Place;
 
   init: () => Promise<void>;
   setPanel: (p: Panel) => void;
@@ -32,7 +35,11 @@ interface State {
   removeMemory: (id: string) => Promise<void>;
   restoreDemos: () => Promise<void>;
   setHint: (h: string | null) => void;
+  setPlace: (p: Place) => void;
 }
+
+/** Локация дня; для старых записей без поля определяем по тексту. */
+export const placeOf = (m: Memory): Place => m.atmosphere.place ?? detectPlace(`${m.title} ${m.text}`);
 
 export const useStore = create<State>((set, get) => ({
   memories: [],
@@ -44,6 +51,7 @@ export const useStore = create<State>((set, get) => ({
   preview: null,
   hint: null,
   request: 0,
+  place: "room",
 
   init: async () => {
     let memories = await loadMemories();
@@ -64,6 +72,7 @@ export const useStore = create<State>((set, get) => ({
   setPanel: (panel) => set({ panel, preview: panel === "album" ? get().preview : null }),
   setPreview: (preview) => set({ preview }),
   setHint: (hint) => set({ hint }),
+  setPlace: (place) => set({ place }),
 
   relive: (m) => {
     // Звук разблокируем сразу, в обработчике клика.

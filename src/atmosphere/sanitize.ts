@@ -1,7 +1,7 @@
 // Приводит любой ответ (от модели или из базы) к допустимым значениям,
 // чтобы сцена никогда не получила NaN или неверный цвет.
 
-import { NEUTRAL_ATMOSPHERE, PARTICLE_TYPES, type Atmosphere, type ParticleType } from "./types";
+import { NEUTRAL_ATMOSPHERE, PARTICLE_TYPES, PLACES, type Atmosphere, type ParticleType, type Place } from "./types";
 
 const clamp = (v: unknown, a: number, b: number, d: number) => {
   const n = typeof v === "number" && Number.isFinite(v) ? v : d;
@@ -48,5 +48,6 @@ export function sanitizeAtmosphere(raw: Partial<Atmosphere> | null | undefined):
     glow: clamp(r.glow, 0, 2, d.glow),
     lampColor: hex(r.lampColor, d.lampColor),
     nightSky: typeof r.nightSky === "boolean" ? r.nightSky : d.nightSky,
+    place: PLACES.includes(r.place as Place) ? (r.place as Place) : "room",
   };
 }

@@ -1,5 +1,5 @@
 import { Canvas, useThree } from "@react-three/fiber";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Suspense, useEffect } from "react";
 import { useQuality, useQualitySettings } from "./quality";
@@ -14,6 +14,8 @@ import { Garland } from "./Garland";
 import { RoomSounds } from "./RoomSounds";
 import { Pet } from "./Pet";
 import { Room } from "./Room";
+import { Locations } from "./Locations";
+import { useStore } from "../store";
 
 export function Scene() {
   return (
@@ -28,14 +30,19 @@ export function Scene() {
       <FrameLimiter />
       <Suspense fallback={null}>
         <AtmosphereRig />
-        <Room />
-        <Album3D />
-        <PhotoStrip />
-        <Garland />
+        <RoomOnly>
+          <Room />
+          <Album3D />
+          <PhotoStrip />
+          <Garland />
+        </RoomOnly>
+        <Locations />
         <RoomSounds />
         <Character />
         <Pet />
-        <Interact />
+        <InRoom>
+          <Interact />
+        </InRoom>
         <CameraFollow />
         <Particles />
         {import.meta.env.DEV && <DevHandle />}
@@ -55,6 +62,18 @@ export function Scene() {
       />
     </Canvas>
   );
+}
+
+/** Комната прячется, пока персонаж в локации воспоминания (но не выгружается). */
+function RoomOnly({ children }: { children: ReactNode }) {
+  const inRoom = useStore((s) => s.place === "room");
+  return <group visible={inRoom}>{children}</group>;
+}
+
+/** Клики по мебели работают только в комнате. */
+function InRoom({ children }: { children: ReactNode }) {
+  const inRoom = useStore((s) => s.place === "room");
+  return inRoom ? <>{children}</> : null;
 }
 
 /** Только в режиме разработки: доступ к камере из консоли и тестов. */

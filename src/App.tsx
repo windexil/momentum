@@ -6,6 +6,7 @@ import { CustomizePanel } from "./ui/CustomizePanel";
 import { Hud } from "./ui/Hud";
 import { Loader } from "./ui/Loader";
 import { MemoryTransition } from "./ui/MemoryTransition";
+import { LocationTravel } from "./ui/LocationTravel";
 import { NewMemoryForm } from "./ui/NewMemoryForm";
 import { StripEditor } from "./ui/StripEditor";
 import { useHeroUI } from "./scene/heroControl";
@@ -29,6 +30,7 @@ export default function App() {
       {loaded && panel === "custom" && <CustomizePanel />}
       {loaded && <StripEditor />}
       <MemoryTransition />
+      <LocationTravel />
       <Loader />
     </div>
   );

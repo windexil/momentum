@@ -35,6 +35,8 @@ export function AtmosphereRig() {
     if (lamp.current && lampTarget.current) lamp.current.target = lampTarget.current;
   }, []);
   const floorLamp = useRef<THREE.PointLight>(null);
+  /** лампы, окно и луч света — только в комнате, в локации воспоминания их нет */
+  const roomFx = useRef<THREE.Group>(null);
   const bloom = useRef<EffectWithIntensity>(null);
   const vignette = useRef<VignetteEffectLike>(null);
   const bc = useRef<BCEffectLike>(null);
@@ -191,6 +193,10 @@ export function AtmosphereRig() {
     // Туман и фон
     fog.color.copy(live.skyColor).lerp(live.ambientColor, 0.5).multiplyScalar(0.5 + (1 - live.night) * 0.3);
     fog.density = 0.004 + live.haze * 0.03;
+    const inRoom = useStore.getState().place === "room";
+    roomFx.current!.visible = inRoom;
+    // на открытом месте дымка гуще: горизонт растворяется в небе
+    if (!inRoom) fog.density = Math.max(fog.density, 0.022);
     bg.copy(live.palette[4]).multiplyScalar(0.35 + (1 - live.night) * 0.15);
 
     // Пост-обработка
@@ -238,6 +244,7 @@ export function AtmosphereRig() {
         shadow-camera-near={1}
         shadow-camera-far={30}
       />
+      <group ref={roomFx}>
       {/* настольная лампа */}
       <group position={[DESK.x + 0.88, 0.8, DESK.z - 0.26]}>
         <mesh position={[0, 0.02, 0]}>
@@ -288,6 +295,7 @@ export function AtmosphereRig() {
         <planeGeometry args={[WINDOW.w + 0.5, WINDOW.h + 0.4]} />
       </mesh>
       <mesh geometry={beamGeo} material={beamMat} />
+      </group>
       {/* окружение для отражений на лакированном дереве и металле — без загрузки файлов */}
       <Environment resolution={128} frames={1}>
         <Lightformer form="rect" intensity={3} color="#fff4e2" position={[0.6, 3, -6]} scale={[4, 3, 1]} />

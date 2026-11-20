@@ -168,7 +168,7 @@ export function CameraFollow() {
       window.removeEventListener("pointerup", up);
     };
   }, [gl]);
-  const zoom = useRef({ listening: false, goal: null as number | null, before: 0, t: 0, push: false, fov: 0 });
+  const zoom = useRef({ listening: false, goal: null as number | null, before: 0, t: 0, push: false, fov: 0, tp: 0 });
   // вид от первого лица за столом
   const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
 
@@ -227,7 +227,10 @@ export function CameraFollow() {
       return;
     }
     tmp.goal.set(hero.pos.x, 0.85 + hero.lie * 0.15, hero.pos.z);
-    tmp.delta.subVectors(tmp.goal, controls.target).multiplyScalar(1 - Math.exp(-3 * dt));
+    // после переноса персонажа камера прыгает следом сразу
+    const snap = hero.teleports !== zoom.current.tp;
+    zoom.current.tp = hero.teleports;
+    tmp.delta.subVectors(tmp.goal, controls.target).multiplyScalar(snap ? 1 : 1 - Math.exp(-3 * dt));
     controls.target.add(tmp.delta);
     camera.position.add(tmp.delta);
 

@@ -15,7 +15,7 @@ import { BOUNDS, findPath, moveWithCollision, nearestFree } from "./nav";
 import { heroCmd } from "./heroControl";
 
 /** Команды питомцу из интерфейса: позвать к себе или погладить. */
-const petReq = { call: false, pet: false };
+const petReq = { call: false, pet: false, tp: null as THREE.Vector3 | null };
 /** Где сейчас питомец (для кнопок и подхода персонажа) */
 export const petInfo = {
   pos: new THREE.Vector3(0.8, 0, -0.9),
@@ -28,6 +28,10 @@ export const petInfo = {
 export const petCmd = {
   call() {
     petReq.call = true;
+  },
+  /** перенести питомца вместе с персонажем (в локацию воспоминания и обратно) */
+  teleport(p: THREE.Vector3) {
+    petReq.tp = p.clone();
   },
   pet() {
     petReq.pet = true;
@@ -176,9 +180,21 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
       setBubble(mood);
     }
 
+    if (petReq.tp) {
+      st.pos.copy(petReq.tp);
+      petReq.tp = null;
+      st.onBed = 0;
+      st.path = [];
+      st.mode = "rest";
+      st.modeT = 2;
+    }
+    // в локации воспоминания сидит рядом с хозяином и никуда не уходит
+    const inLoc = useStore.getState().place !== "room";
+    if (inLoc) (st.mode = "rest"), (st.modeT = 2);
+
     // Куда идти
-    const wantBed = hero.lie > 0.6;
-    const nearChair = hero.sit > 0.5;
+    const wantBed = hero.lie > 0.6 && !inLoc;
+    const nearChair = hero.sit > 0.5 && !inLoc;
     let goal: THREE.Vector3;
     let tol = 0.05;
     if (wantBed) goal = BED_FLOOR;

@@ -764,3 +764,11 @@ input[type=file]::file-selector-button {
 .loader-leaf { background: url("./assets/page-r.webp") center / cover, #cdb593; }
 
 .credits { margin: 14px 0 0; font-size: 11px; line-height: 1.4; color: var(--kraft-muted); }
+
+/* перенос в локацию воспоминания: экран заливается тёплым светом и расходится */
+.travel-veil {
+  position: fixed; inset: 0; z-index: 14; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 45%, #fffaf0 0%, #fbeacb 55%, #e9cfa2 100%);
+  transition: opacity 1.1s ease;
+}
+.travel-veil.on { opacity: 1; transition: opacity .75s ease-in; }

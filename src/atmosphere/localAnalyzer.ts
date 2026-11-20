@@ -9,6 +9,7 @@ import { clamp, lerp } from "../util";
 import { hexToRgb, hsl, mixHex, rgbToHsl, tint } from "./color";
 import type { AnalyzeInput, Atmosphere, ParticleType } from "./types";
 import { MOODS, type MoodId } from "./moods";
+import { detectPlace } from "./place";
 
 interface Theme {
   id: string;
@@ -192,6 +193,7 @@ export function analyzeLocally(input: AnalyzeInput): Atmosphere {
     glow: clamp(0.35 + (night ? 0.6 : 0) + energy * 0.5, 0, 2),
     lampColor: tint(hsl(baseHue, 0.7, 0.72), warmth),
     nightSky: night,
+    place: detectPlace(`${input.title} ${input.text}`),
   };
 }
 

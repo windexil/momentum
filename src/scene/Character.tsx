@@ -35,6 +35,8 @@ export const hero = {
   /** фаза шага и сила ходьбы (для звука шагов) */
   walk: 0,
   moveAmt: 0,
+  /** счётчик мгновенных переносов: камера по нему прыгает следом, а не плывёт */
+  teleports: 0,
 };
 
 // Пропорции чиби
@@ -209,6 +211,20 @@ export function Character() {
     }
     // сняли наушники вручную во время музыки — музыка затихает
     if (phase === "listening" && control.hp !== "head") store.stopReliving();
+
+    // ---- Перенос в локацию воспоминания и обратно ----
+    if (control.teleport) {
+      const tp = control.teleport;
+      control.teleport = null;
+      st.pos.copy(tp.pos);
+      st.rot = tp.rot;
+      st.sit = st.lie = st.desk = 0;
+      st.vel.set(0, 0, 0);
+      st.path = [];
+      control.pose = "stand";
+      control.queue = [];
+      hero.teleports++;
+    }
 
     // ---- Очередь действий ----
     tmp.desired.set(0, 0, 0);
@@ -492,6 +508,8 @@ export function Character() {
     // ---- Кружка: на столике или в правой руке ----
     handR.current!.getWorldPosition(tmp.handW);
     const m = mug.current!;
+    // кружка стоит на столике в комнате; в локации воспоминания её нет
+    m.visible = useStore.getState().place === "room";
     m.position.lerpVectors(SPOTS.mugRest, tmp.handW, grab);
     // у чиби короткие ручки: при глотке кружка чуть «подплывает» к губам
     m.position.y += sip * 0.1;

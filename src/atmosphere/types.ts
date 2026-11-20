@@ -13,6 +13,10 @@ export const PARTICLE_TYPES = [
 ] as const;
 export type ParticleType = (typeof PARTICLE_TYPES)[number];
 
+/** Куда переносится персонаж, чтобы пережить день; room — остаться в комнате. */
+export const PLACES = ["room", "beach", "forest", "city", "winter"] as const;
+export type Place = (typeof PLACES)[number];
+
 export interface Atmosphere {
   /** Короткое название настроения: «тёплая ностальгия», «летняя эйфория». */
   mood: string;
@@ -60,6 +64,8 @@ export interface Atmosphere {
   lampColor: string;
   /** Звёзды за окном. */
   nightSky: boolean;
+  /** Локация воспоминания (у старых записей может не быть). */
+  place?: Place;
 }
 
 export const NEUTRAL_ATMOSPHERE: Atmosphere = {

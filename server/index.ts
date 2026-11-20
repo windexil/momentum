@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { PARTICLE_TYPES, type AnalyzeInput } from "../src/atmosphere/types";
+import { PARTICLE_TYPES, PLACES, type AnalyzeInput } from "../src/atmosphere/types";
 import { sanitizeAtmosphere } from "../src/atmosphere/sanitize";
 
 loadDotEnv();
@@ -46,12 +46,16 @@ const AtmosphereSchema = z.object({
   glow: z.number().describe("0..2 сила свечения"),
   lampColor: z.string().describe("#rrggbb настольной лампы"),
   nightSky: z.boolean(),
+  place: z
+    .enum(PLACES)
+    .describe("Куда перенести персонажа, чтобы пережить день: beach (море, пляж), forest (лес, поход, природа), city (город, улицы, огни), winter (снег, зима на улице); room — если день прошёл дома или место неясно"),
 });
 
 const SYSTEM = `Ты — художник по свету и атмосфере в интерактивном 3D-дневнике воспоминаний.
 Комната всегда одна и та же (стол, кресло, кровать, окно, полки, растения). Меняются только свет, палитра, небо за окном, дымка, частицы и скорость анимаций.
 По тексту воспоминания, фотографиям и характеристикам музыки подбери параметры так, чтобы человек снова почувствовал этот день.
 Опирайся на конкретные детали: время суток и сезон из текста, реальные цвета с фотографий, темп и громкость музыки. Не выбирай шаблон, а выводи каждый параметр из входных данных.
+Если по тексту ясно, где прошёл день (море, лес, город, зимняя улица), укажи это место в place: персонаж перенесётся туда. Если день прошёл дома или место неясно, оставь room.
 Тексты (mood, description) пиши по-русски, коротко и образно, без кавычек.
 Палитру (palette) бери из этого списка: определи главное настроение воспоминания и верни ровно его 5 цветов в указанном порядке (от светлого к тёмному). В mood начни с названия выбранного настроения.
 ${Object.values(MOODS).map((m) => `- ${m.name}: ${m.palette.join(", ")}`).join("\n")}`;

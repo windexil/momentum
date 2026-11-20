@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { sfx } from "../audio/roomSfx";
 import { useAvatar } from "../avatar";
 import { useRoom } from "../roomStore";
+import { useStore } from "../store";
 import { hero } from "./Character";
 import { petInfo } from "./Pet";
 import { CHAIR, ROOM } from "./Room";
@@ -70,8 +71,11 @@ export function RoomSounds() {
     const sec = Math.floor(performance.now() / 1000);
     if (sec !== s.sec) {
       s.sec = sec;
-      const [v, pan] = place(CLOCK, 0.3, 0.35);
-      sfx.tick(sec % 2 === 1, v, pan);
+      // в локации воспоминания часов нет
+      if (useStore.getState().place === "room") {
+        const [v, pan] = place(CLOCK, 0.3, 0.35);
+        sfx.tick(sec % 2 === 1, v, pan);
+      }
     }
 
     // ---- торшер

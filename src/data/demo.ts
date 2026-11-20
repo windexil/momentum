@@ -1,4 +1,4 @@
-// Три демонстрационных воспоминания с заметно разной атмосферой.
+// Пять демонстрационных воспоминаний с заметно разной атмосферой.
 // Картинки нарисованы в SVG прямо здесь, музыка синтезируется, так что
 // всё содержимое демо собственное и без проблем с лицензиями.
 // Атмосфера считается тем же анализатором, что и для новых записей.
@@ -52,6 +52,24 @@ const winterNight = svg(`
 <g fill="#ffd36b"><circle cx="40" cy="40" r="5"/><circle cx="25" cy="85" r="5"/><circle cx="62" cy="95" r="5"/><circle cx="15" cy="135" r="5"/><circle cx="70" cy="140" r="5"/></g><path d="M40 -10 l5 10 -10 0z" fill="#ffd36b"/></g>
 <g transform="translate(260 180)"><rect width="80" height="56" fill="#7d4b3a"/><path d="M-8 0 L40 -36 L88 0Z" fill="#e8f0ff"/><rect x="28" y="16" width="22" height="18" fill="#ffcf6e"/></g>`);
 
+const forestWalk = svg(`
+<defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe8b0"/><stop offset="1" stop-color="#7fb069"/></linearGradient></defs>
+<rect width="400" height="300" fill="url(#f)"/>
+<circle cx="300" cy="70" r="40" fill="#fff6c8" opacity=".9"/>
+<g fill="#2f6b3a">${Array.from({ length: 9 }, (_, i) => `<path d="M${i * 48 + 10} 230 l26 -${110 + (i % 3) * 25} l26 ${110 + (i % 3) * 25}z"/>`).join("")}</g>
+<path d="M170 300 Q200 240 215 205 L235 205 Q240 250 260 300Z" fill="#c9a36b"/>
+<g transform="translate(120 250)"><rect x="-3" y="0" width="6" height="14" fill="#f3e6cf"/><ellipse cx="0" cy="0" rx="14" ry="8" fill="#d2453b"/></g>
+<g fill="#fff6a8">${Array.from({ length: 12 }, (_, i) => `<circle cx="${(i * 67) % 400}" cy="${150 + ((i * 41) % 120)}" r="3" opacity=".8"/>`).join("")}</g>`);
+
+const cityNight = svg(`
+<rect width="400" height="300" fill="#1b1f3a"/>
+<g fill="#2b3157">${Array.from({ length: 8 }, (_, i) => `<rect x="${i * 52}" y="${80 + ((i * 37) % 70)}" width="46" height="220"/>`).join("")}</g>
+<g fill="#ffd27a">${Array.from({ length: 40 }, (_, i) => `<rect x="${(i * 13) % 52 + Math.floor(i / 5) * 52 + 6}" y="${110 + ((i * 29) % 140)}" width="7" height="9" opacity="${0.5 + (i % 3) * 0.2}"/>`).join("")}</g>
+<rect y="250" width="400" height="50" fill="#14172b"/>
+<g><rect x="70" y="150" width="4" height="100" fill="#555"/><circle cx="72" cy="148" r="9" fill="#ffe3a0"/><circle cx="72" cy="148" r="30" fill="#ffe3a0" opacity=".18"/></g>
+<g><rect x="300" y="150" width="4" height="100" fill="#555"/><circle cx="302" cy="148" r="9" fill="#ffe3a0"/><circle cx="302" cy="148" r="30" fill="#ffe3a0" opacity=".18"/></g>
+<rect x="180" y="120" width="70" height="20" rx="4" fill="#ff5fa2" opacity=".85"/>`);
+
 interface DemoSpec {
   id: string;
   date: string;
@@ -90,6 +108,24 @@ const SPECS: DemoSpec[] = [
     photos: [winterNight],
     photoColors: ["#0d1840", "#2c3f86", "#e8f0ff", "#ffd36b"],
     preset: "winter",
+  },
+  {
+    id: "demo-forest",
+    date: "2025-08-23",
+    title: "Поход в лес",
+    text: "Ушли с друзьями в поход: тропинка через лес, запах хвои, грибы под каждым деревом. Вечером у костра пели песни, а вокруг летали светлячки. Тишина и природа.",
+    photos: [forestWalk],
+    photoColors: ["#cfe8b0", "#7fb069", "#2f6b3a", "#c9a36b"],
+    preset: "summer",
+  },
+  {
+    id: "demo-city",
+    date: "2025-11-08",
+    title: "Огни ночного города",
+    text: "Гуляли до полуночи по ночному городу: мокрые улицы, огни витрин, неон над кафе и фонари вдоль проспекта. Говорили обо всём и не хотели расходиться.",
+    photos: [cityNight],
+    photoColors: ["#1b1f3a", "#2b3157", "#ffd27a", "#ff5fa2"],
+    preset: "rain",
   },
 ];
 
