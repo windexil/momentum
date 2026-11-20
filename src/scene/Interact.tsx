@@ -111,12 +111,8 @@ export function Interact() {
       <mesh position={[DESK.x - 0.1, 0.5, DESK.z + 0.75]} material={ghost} onClick={tap(() => heroCmd.desk())} {...hover}>
         <boxGeometry args={[0.6, 1.0, 0.6]} />
       </mesh>
-      <mesh position={[DESK.x, 0.36, DESK.z]} material={ghost} onClick={surface("desk", () => heroCmd.desk())}>
+      <mesh position={[DESK.x, 0.36, DESK.z]} material={ghost} onClick={tap(() => heroCmd.desk())}>
         <boxGeometry args={[2.0, 0.72, 0.85]} />
-      </mesh>
-      {/* столешница: сюда тоже можно положить наушники */}
-      <mesh position={[DESK.x + 0.55, 0.82, DESK.z + 0.15]} material={ghost} onClick={surface("desk", () => heroCmd.desk())} {...hover}>
-        <boxGeometry args={[0.8, 0.06, 0.5]} />
       </mesh>
     </group>
   );

@@ -14,7 +14,7 @@ import { HeadphonesModel } from "./HeadphonesModel";
 import { control, heroCmd, HP_PLACES, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
 import { DESK } from "./Room";
-import { CHAIR_OUT, props } from "./sceneState";
+import { props } from "./sceneState";
 import { findPath, moveWithCollision } from "./nav";
 
 /** Общее состояние персонажа: по нему ориентируются питомец, камера и эффекты. */
@@ -99,9 +99,6 @@ export function Character() {
       desk: 0,
       drink: 0,
       pull: 0,
-      chair: 0, // ход стула: 0..1
-      chairFrom: 0,
-      idleChair: 0, // сколько стоим без дела при выдвинутом стуле
       turnFirst: false,
       carry: 0, // 0 — наушники на столике, 1 — у персонажа
       onHead: 0, // 0 — на шее, 1 — на голове
@@ -231,8 +228,7 @@ export function Character() {
           // маршрут в обход мебели считаем один раз на шаг
           if (st.pathFor !== step) {
             st.pathFor = step;
-            // у стола идём заданным коридором, а не в обход
-            st.path = step.via ? [...step.via.map((v) => v.clone()), step.to.clone()] : findPath(st.pos, step.to, RADIUS);
+            st.path = findPath(st.pos, step.to, RADIUS);
             st.stuck = 0;
             st.replans = 0;
             st.lastDist = Infinity;
@@ -265,7 +261,7 @@ export function Character() {
               st.stuck = 0;
               st.lastDist = Infinity;
               if (++st.replans > 2) heroCmd.shift();
-              else if (!step.via) st.path = findPath(st.pos, step.to, RADIUS);
+              else st.path = findPath(st.pos, step.to, RADIUS);
             }
           }
         }
@@ -282,19 +278,6 @@ export function Character() {
           st.pull = 0;
           heroCmd.shift();
         }
-      } else if (step.k === "chair") {
-        // выдвигаем или задвигаем стул у стола, держась за спинку
-        if (st.chair === 0) st.chairFrom = props.chairOut;
-        st.chair = Math.min(1, st.chair + dt / 1.1);
-        const e = smoother(st.chair);
-        props.chairOut = step.to ? THREE.MathUtils.lerp(st.chairFrom, CHAIR_OUT, e) : st.chairFrom * (1 - e);
-        if (st.chair >= 1) {
-          st.chair = 0;
-          heroCmd.shift();
-        }
-      } else if (step.k === "cb") {
-        heroCmd.shift();
-        step.fn();
       } else if (step.k === "drink") {
         // взять кружку, отпить, поставить обратно
         st.drink = Math.min(1, st.drink + dt / 3.6);
@@ -342,8 +325,7 @@ export function Character() {
     st.vel.x = damp(st.vel.x, tmp.desired.x, 9, dt);
     st.vel.z = damp(st.vel.z, tmp.desired.z, 9, dt);
     const speed = Math.hypot(st.vel.x, st.vel.z);
-    const ignore = step?.k === "goto" ? step.ignore : undefined;
-    if (speed > 0.01) moveWithCollision(st.pos, st.vel.x * dt, st.vel.z * dt, RADIUS, ignore);
+    if (speed > 0.01) moveWithCollision(st.pos, st.vel.x * dt, st.vel.z * dt, RADIUS);
     if (speed > 0.08) st.rot += angleTo(st.rot, Math.atan2(st.vel.x, st.vel.z)) * (1 - Math.exp(-10 * dt));
     else if (faceAngle !== null) st.rot += angleTo(st.rot, faceAngle) * (1 - Math.exp(-7 * dt));
     const moveAmt = Math.min(1, speed / MAX_SPEED);
@@ -363,16 +345,7 @@ export function Character() {
     const deskA = smoother(clamp01(st.desk / 0.3));
     const deskB = smoother(clamp01((st.desk - 0.3) / 0.45));
     const deskC = smoother(clamp01((st.desk - 0.75) / 0.25));
-    const seatChair = 0.45 * deskA - 0.28 * deskC;
-    // стул уже выдвинут (проходили к столу) — садимся на него, потом придвигаемся
-    if (deskA > 0.99) props.chairOut = Math.min(props.chairOut, seatChair);
-    props.deskChair = Math.max(seatChair, props.chairOut);
-    // стул остался выдвинутым, а задвинуть некому — задвигаем сами
-    st.idleChair = !control.queue.length && props.chairOut > 0.01 && !props.petPushing && st.desk === 0 ? st.idleChair + dt : 0;
-    if (st.idleChair > 2) {
-      st.idleChair = 0;
-      heroCmd.pushChair();
-    }
+    props.deskChair = 0.45 * deskA - 0.28 * deskC;
     const yaw = st.rot + angleTo(st.rot, 0) * lieB + angleTo(st.rot, Math.PI) * deskB;
     const tilt = LIE_TILT * lieB;
     const chairLift = sitE * SIT_LIFT + deskB * DESK_LIFT;
@@ -446,7 +419,7 @@ export function Character() {
     const sip = d > 0 ? smoother(clamp01((d - 0.22) / 0.2)) * smoother(clamp01((0.82 - d) / 0.2)) : 0;
     const reachMug = Math.sin(clamp01(d / 0.22) * Math.PI) * 0.6 + Math.sin(clamp01((d - 0.82) / 0.18) * Math.PI) * 0.6;
     // за столом: тянем стул (A), потом руки ложатся на столешницу (C)
-    const pull = Math.max(Math.sin(deskA * Math.PI) * (1 - deskB), Math.sin(st.chair * Math.PI));
+    const pull = Math.sin(deskA * Math.PI) * (1 - deskB);
     const onDesk = deskC;
     const freeArm = 1 - Math.max(reaching, h, pull, onDesk);
     // в кресле локти лежат на подлокотниках, предплечья вперёд

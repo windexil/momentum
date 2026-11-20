@@ -14,7 +14,7 @@ export function ActionBar() {
   const listening = phase === "listening";
   const hasPet = useAvatar((s) => s.avatar.pet !== "none");
   // кладём туда, где персонаж сейчас: за столом — на стол, в кровати — на кровать
-  const near = pose === "desk" ? "desk" : pose === "lie" ? "bed" : "side";
+  const near = pose === "lie" ? "bed" : "side";
 
   return (
     <div className="actions">
