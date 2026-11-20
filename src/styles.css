@@ -496,17 +496,16 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* перелистывание: лист чуть приподнимается, мягкая S-кривая скорости */
 .flipping-next { animation: flipNext .95s cubic-bezier(.36,.07,.2,1) forwards; }
 .flipping-prev { animation: flipPrev .95s cubic-bezier(.36,.07,.2,1) forwards; }
+/* лист вращается строго вокруг корешка — без сдвигов, чтобы не «уезжал» */
 @keyframes flipNext {
-  0% { transform: rotateY(0) translateZ(0); }
-  12% { transform: rotateY(-8deg) translateZ(6px); }
-  50% { transform: rotateY(-90deg) translateZ(26px); }
-  100% { transform: rotateY(-180deg) translateZ(0); }
+  0% { transform: rotateY(0); }
+  12% { transform: rotateY(-8deg); }
+  100% { transform: rotateY(-180deg); }
 }
 @keyframes flipPrev {
-  0% { transform: rotateY(0) translateZ(0); }
-  12% { transform: rotateY(8deg) translateZ(6px); }
-  50% { transform: rotateY(90deg) translateZ(26px); }
-  100% { transform: rotateY(180deg) translateZ(0); }
+  0% { transform: rotateY(0); }
+  12% { transform: rotateY(8deg); }
+  100% { transform: rotateY(180deg); }
 }
 /* свет и тень на самом листе: темнеет, когда встаёт ребром */
 .leaf-shade { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
