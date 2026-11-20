@@ -5,11 +5,12 @@
 // перенос наушников со столика на шею и на голову, покачивание в такт.
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { moodOf, useAvatar, type Mood } from "../avatar";
 import { useStore } from "../store";
 import { Waveform } from "./SoundFx";
+import { HeadphonesModel } from "./HeadphonesModel";
 import { control, heroCmd, HP_PLACES, SPOTS, useHeroUI, type Pose } from "./heroControl";
 import { live } from "./live";
 import { DESK } from "./Room";
@@ -697,9 +698,9 @@ export function Character() {
 
       {/* наушники живут в мировых координатах и «перелетают» на голову */}
       <group ref={headphones}>
-        <mesh position={[0, 0.02, 0]} castShadow material={mats.hp}>
-          <torusGeometry args={[HEAD_R + 0.07, 0.035, 10, 32, Math.PI]} />
-        </mesh>
+        <Suspense fallback={null}>
+          <HeadphonesModel body={mats.hp} pads={mats.hpPad} />
+        </Suspense>
         {avatar.headphones === "cat" &&
           [-1, 1].map((s) => (
             <group key={s} position={[s * 0.25, 0.33, 0.02]} rotation-z={-s * 0.5} scale={1.35}>
@@ -711,19 +712,6 @@ export function Character() {
               </mesh>
             </group>
           ))}
-        {[-1, 1].map((s) => (
-          <group key={s} position={[s * (HEAD_R + 0.07), -0.04, 0]}>
-            <mesh rotation-z={Math.PI / 2} castShadow material={mats.hp}>
-              <cylinderGeometry args={[0.12, 0.12, 0.1, 24]} />
-            </mesh>
-            <mesh position={[-s * 0.055, 0, 0]} rotation-z={Math.PI / 2} material={mats.hpPad}>
-              <cylinderGeometry args={[0.1, 0.1, 0.03, 24]} />
-            </mesh>
-            <mesh position={[s * 0.055, 0, 0]} rotation-z={Math.PI / 2} material={mats.hpPad}>
-              <cylinderGeometry args={[0.07, 0.07, 0.02, 20]} />
-            </mesh>
-          </group>
-        ))}
       </group>
 
       {/* кружка какао со столика */}
