@@ -11,6 +11,7 @@ import { NewMemoryForm } from "./ui/NewMemoryForm";
 import { StripEditor } from "./ui/StripEditor";
 import { useHeroUI } from "./scene/heroControl";
 import { hasWebGL, NoWebGL, SceneBoundary } from "./ui/NoWebGL";
+import { useQuality } from "./scene/quality";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -19,9 +20,22 @@ export default function App() {
   const atDesk = useHeroUI((s) => s.pose === "desk");
 
   // 3D может не запуститься (нет WebGL) или погаснуть посреди работы
-  const [gl, setGl] = useState<"ok" | "none" | "lost">(() => (hasWebGL() ? "ok" : "none"));
+  const [gl, setGl] = useState<"ok" | "none" | "lost" | "retry">(() => (hasWebGL() ? "ok" : "none"));
+  // после сбоя видеокарты сами перезапускаем сцену в щадящем режиме (до двух раз)
+  const [sceneKey, setSceneKey] = useState(0);
   useEffect(() => {
-    const lost = () => setGl("lost");
+    let tries = 0;
+    const lost = () => {
+      if (tries++ < 2) {
+        useQuality.getState().setSafe(true);
+        useQuality.getState().setMode("low");
+        setGl("retry");
+        window.setTimeout(() => {
+          setSceneKey((k) => k + 1);
+          setGl("ok");
+        }, 800);
+      } else setGl("lost");
+    };
     window.addEventListener("arttech-gl-lost", lost);
     return () => window.removeEventListener("arttech-gl-lost", lost);
   }, []);
@@ -33,7 +47,7 @@ export default function App() {
   return (
     <div className="app">
       {gl === "ok" && (
-        <SceneBoundary onFail={() => setGl("none")}>
+        <SceneBoundary key={sceneKey} onFail={() => setGl("none")}>
           <Scene />
         </SceneBoundary>
       )}
@@ -44,7 +58,7 @@ export default function App() {
       {loaded && <StripEditor />}
       <MemoryTransition />
       <LocationTravel />
-      {gl === "ok" ? <Loader /> : <NoWebGL lost={gl === "lost"} />}
+      {gl === "ok" ? <Loader /> : gl === "retry" ? null : <NoWebGL lost={gl === "lost"} />}
     </div>
   );
 }

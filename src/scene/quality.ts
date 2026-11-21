@@ -40,7 +40,25 @@ function startLevel(): QualityLevel {
   return "high";
 }
 
+const SAFE_KEY = "arttech-gpu-safe";
+function readSafe(): boolean {
+  try {
+    return localStorage.getItem(SAFE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Щадящий режим для слабых или капризных видеокарт: включается сам, если
+ * браузер «потерял» WebGL. Без сглаживания, затенения и свечения, тени мельче.
+ */
+const SAFE: QualitySettings = { dpr: 1, msaa: 0, ao: false, aoQuality: "performance", shadowSize: 512, bloom: false };
+
 interface QualityState {
+  /** щадящий режим после сбоя видеокарты */
+  safe: boolean;
+  setSafe: (v: boolean) => void;
   mode: QualityMode;
   /** текущий уровень в режиме «авто» */
   autoLevel: QualityLevel;
@@ -51,6 +69,16 @@ interface QualityState {
 }
 
 export const useQuality = create<QualityState>((set, get) => ({
+  safe: readSafe(),
+  setSafe(safe) {
+    set({ safe });
+    try {
+      if (safe) localStorage.setItem(SAFE_KEY, "1");
+      else localStorage.removeItem(SAFE_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
   mode: readMode(),
   autoLevel: startLevel(),
   level() {
@@ -78,5 +106,6 @@ export const useQuality = create<QualityState>((set, get) => ({
 /** Текущие настройки (реактивно). */
 export function useQualitySettings() {
   const lvl = useQuality((s) => (s.mode === "auto" ? s.autoLevel : s.mode));
-  return { level: lvl, ...QUALITY[lvl] };
+  const safe = useQuality((s) => s.safe);
+  return safe ? { level: "low" as QualityLevel, safe, ...SAFE } : { level: lvl, safe, ...QUALITY[lvl] };
 }

@@ -18,10 +18,11 @@ import { Locations } from "./Locations";
 import { useStore } from "../store";
 
 export function Scene() {
+  const safe = useQuality((s) => s.safe);
   return (
     <Canvas
       frameloop="demand"
-      shadows
+      shadows={!safe}
       dpr={1}
       camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
