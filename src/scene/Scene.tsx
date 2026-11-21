@@ -25,6 +25,10 @@ export function Scene() {
       dpr={1}
       camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+      onCreated={({ gl }) => {
+        // видеокарта может «потеряться» (сбой драйвера) — сообщаем интерфейсу
+        gl.domElement.addEventListener("webglcontextlost", () => window.dispatchEvent(new Event("arttech-gl-lost")));
+      }}
     >
       <QualityRig />
       <FrameLimiter />
