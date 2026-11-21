@@ -784,3 +784,6 @@ input[type=file]::file-selector-button {
 .nogl-card p { margin: 0 0 10px; line-height: 1.45; }
 .nogl-card ul { margin: 0 0 16px; padding-left: 20px; line-height: 1.45; }
 .nogl-card button { font: inherit; font-weight: 700; padding: 9px 18px; border-radius: 8px; border: 0; cursor: pointer; background: #8a3b2a; color: #fff6e6; }
+.nogl-diag{margin-top:14px;font-size:12px;opacity:.85}
+.nogl-diag summary{cursor:pointer}
+.nogl-diag pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;background:rgba(0,0,0,.08);padding:8px;border-radius:6px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.35;margin:6px 0 0}

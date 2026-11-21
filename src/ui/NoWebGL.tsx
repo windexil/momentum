@@ -3,6 +3,7 @@
 // показываем понятную записку и кнопку «Попробовать снова».
 
 import { Component, type ReactNode } from "react";
+import { diagLog } from "../diag";
 
 /** Можно ли вообще создать WebGL-контекст в этом браузере */
 export function hasWebGL(): boolean {
@@ -50,6 +51,12 @@ export function NoWebGL({ lost }: { lost?: boolean }) {
           <li>Закройте другие вкладки с 3D или играми и попробуйте снова.</li>
         </ul>
         <button onClick={() => location.reload()}>Попробовать снова</button>
+        {diagLog.length > 0 && (
+          <details className="nogl-diag" open>
+            <summary>Технические подробности (пришлите скриншот разработчику)</summary>
+            <pre>{diagLog.slice(-14).join("\n")}</pre>
+          </details>
+        )}
       </div>
     </div>
   );

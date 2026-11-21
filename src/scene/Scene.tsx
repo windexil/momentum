@@ -16,6 +16,7 @@ import { Pet } from "./Pet";
 import { Room } from "./Room";
 import { Locations } from "./Locations";
 import { useStore } from "../store";
+import { diag } from "../diag";
 
 export function Scene() {
   const safe = useQuality((s) => s.safe);
@@ -28,7 +29,14 @@ export function Scene() {
       gl={{ antialias: false, powerPreference: safe ? "low-power" : "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onCreated={({ gl }) => {
         // видеокарта может «потеряться» (сбой драйвера) — сообщаем интерфейсу
-        gl.domElement.addEventListener("webglcontextlost", () => window.dispatchEvent(new Event("arttech-gl-lost")));
+        const ctx = gl.getContext();
+        const ri = ctx.getExtension("WEBGL_debug_renderer_info");
+        diag(`GPU: ${ri ? ctx.getParameter(ri.UNMASKED_RENDERER_WEBGL) : "?"}, canvas ${gl.domElement.width}×${gl.domElement.height}`);
+        gl.domElement.addEventListener("webglcontextlost", (e) => {
+          const info = gl.info;
+          diag(`✖ контекст потерян: ${(e as WebGLContextEvent).statusMessage || "без причины"}; кадров ${info.render.frame}, геометрий ${info.memory.geometries}, текстур ${info.memory.textures}, программ ${info.programs?.length ?? "?"}, треугольников ${info.render.triangles}`);
+          window.dispatchEvent(new Event("arttech-gl-lost"));
+        });
       }}
     >
       <QualityRig />
