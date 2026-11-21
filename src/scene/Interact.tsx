@@ -134,6 +134,9 @@ const YAW_LEFT = 1.4, YAW_RIGHT = 0.85, PITCH_MAX = 0.8; // обзор за ст
  * Камера следует за персонажем: точка, вокруг которой она вращается,
  * мягко едет за ним. Во время музыки камера чуть приближается.
  */
+/** расстояние камеры в локации воспоминания: видно и персонажа, и место вокруг */
+const LOC_DIST = 11;
+
 export function CameraFollow() {
   const { camera, controls, gl } = useThree() as unknown as {
     camera: THREE.Camera;
@@ -168,7 +171,7 @@ export function CameraFollow() {
       window.removeEventListener("pointerup", up);
     };
   }, [gl]);
-  const zoom = useRef({ listening: false, goal: null as number | null, before: 0, t: 0, push: false, fov: 0, tp: 0 });
+  const zoom = useRef({ listening: false, goal: null as number | null, before: 0, t: 0, push: false, fov: 0, tp: 0, place: "room", roomEl: 0, elGoal: null as number | null });
   // вид от первого лица за столом
   const fp = useRef({ on: false, k: 0, pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 36 });
 
@@ -246,15 +249,29 @@ export function CameraFollow() {
         z.fov = cam.fov;
         z.goal = Math.max(3.6, dist * 0.6);
         z.push = true;
+        if (useStore.getState().place !== "room") (z.goal = LOC_DIST), (z.push = false);
       } else {
         z.goal = z.before || null;
+        z.push = false;
+      }
+    }
+    // в локации отъезжаем дальше, чтобы было видно, куда попали (море, горы, сцену…)
+    const where = useStore.getState().place;
+    if (where !== z.place) {
+      // наклон камеры: в локации ниже к горизонту, дома — как было до перехода
+      const el0 = Math.asin(THREE.MathUtils.clamp(tmp.off.y / (tmp.off.length() || 1), -1, 1));
+      if (z.place === "room") z.roomEl = el0;
+      z.elGoal = where !== "room" ? 0.3 : z.roomEl || null;
+      z.place = where;
+      if (where !== "room") {
+        z.goal = LOC_DIST;
         z.push = false;
       }
     }
     z.t += dt;
     if (z.push && z.t > 1.9) {
       z.push = false;
-      z.goal = Math.max(5.2, z.before * 0.82);
+      z.goal = useStore.getState().place !== "room" ? LOC_DIST : Math.max(5.2, z.before * 0.82);
     }
     // лёгкий «долли-зум»: во время наезда поле зрения сужается, затем возвращается
     if (z.fov) {
@@ -262,6 +279,21 @@ export function CameraFollow() {
       cam.fov += (want - cam.fov) * (1 - Math.exp(-2 * dt));
       cam.updateProjectionMatrix();
       if (!z.push && Math.abs(cam.fov - z.fov) < 0.01) (cam.fov = z.fov), (z.fov = 0), cam.updateProjectionMatrix();
+    }
+    // в локации камера опускается ниже, почти к горизонту: видно небо, горы, сцену
+    {
+      const want = z.elGoal;
+      if (want !== null) {
+        const len = tmp.off.length();
+        const el = Math.asin(THREE.MathUtils.clamp(tmp.off.y / len, -1, 1));
+        if (Math.abs(el - want) < 0.003) z.elGoal = null;
+        else if (Math.abs(el - want) > 0.002) {
+          const ne = el + (want - el) * (1 - Math.exp(-1.5 * dt));
+          const h = Math.hypot(tmp.off.x, tmp.off.z) || 1;
+          tmp.off.set((tmp.off.x / h) * Math.cos(ne) * len, Math.sin(ne) * len, (tmp.off.z / h) * Math.cos(ne) * len);
+          camera.position.copy(controls.target).add(tmp.off);
+        }
+      }
     }
     if (z.goal !== null) {
       const nd = dist + (z.goal - dist) * (1 - Math.exp(-(z.push ? 1.9 : 1.2) * dt));

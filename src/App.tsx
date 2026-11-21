@@ -11,7 +11,6 @@ import { NewMemoryForm } from "./ui/NewMemoryForm";
 import { StripEditor } from "./ui/StripEditor";
 import { useHeroUI } from "./scene/heroControl";
 import { hasWebGL, NoWebGL, SceneBoundary } from "./ui/NoWebGL";
-import { useQuality } from "./scene/quality";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -21,15 +20,12 @@ export default function App() {
 
   // 3D может не запуститься (нет WebGL) или погаснуть посреди работы
   const [gl, setGl] = useState<"ok" | "none" | "lost" | "retry">(() => (hasWebGL() ? "ok" : "none"));
-  // после сбоя видеокарты сами перезапускаем сцену в щадящем режиме (до двух раз)
+  // после сбоя видеокарты сами перезапускаем сцену (до двух раз)
   const [sceneKey, setSceneKey] = useState(0);
   useEffect(() => {
     let tries = 0;
     const lost = () => {
       if (tries++ < 2) {
-        useQuality.getState().setSafe(true);
-        useQuality.setState({ noModels: true });
-        useQuality.getState().setMode("low");
         setGl("retry");
         window.setTimeout(() => {
           setSceneKey((k) => k + 1);

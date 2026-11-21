@@ -1,4 +1,4 @@
-// Локации воспоминаний: море, лес, ночной город и зима.
+// Локации воспоминаний: море, лес, ночной город и зима (остальные — в LocationsMore.tsx).
 // Всё построено из простых фигур в том же мягком стиле, что и комната,
 // без загружаемых моделей. Свет, небо, дымка и частицы задаёт атмосфера дня,
 // поэтому один и тот же пляж бывает и на закате, и в полдень.
@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { useStore } from "../store";
 import { live } from "./live";
 import type { Place } from "../atmosphere/types";
+import { Concert, Desert, Fair, Mountains, Park, Village } from "./LocationsMore";
 
 export function Locations() {
   const place = useStore((s) => s.place);
@@ -26,16 +27,24 @@ export function Locations() {
 }
 
 function LocationBody({ place }: { place: Exclude<Place, "room"> }) {
-  if (place === "beach") return <Beach />;
-  if (place === "forest") return <Forest />;
-  if (place === "city") return <City />;
-  return <Winter />;
+  switch (place) {
+    case "beach": return <Beach />;
+    case "forest": return <Forest />;
+    case "city": return <City />;
+    case "winter": return <Winter />;
+    case "mountains": return <Mountains />;
+    case "park": return <Park />;
+    case "village": return <Village />;
+    case "concert": return <Concert />;
+    case "desert": return <Desert />;
+    case "fair": return <Fair />;
+  }
 }
 
 // ---------- общее ----------
 
 /** Детерминированный генератор случайных чисел: локация всегда одинаковая */
-function rng(seed: number) {
+export function rng(seed: number) {
   return () => {
     seed |= 0;
     seed = (seed + 0x6d2b79f5) | 0;
@@ -45,13 +54,13 @@ function rng(seed: number) {
   };
 }
 
-const mat = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
+export const mat = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
 
-type Item = { p: [number, number, number]; s: number | [number, number, number]; r?: [number, number, number] };
+export type Item = { p: [number, number, number]; s: number | [number, number, number]; r?: [number, number, number] };
 
 /** Много одинаковых предметов за один вызов отрисовки */
-function Inst({ geo, material, items, shadow = true }: { geo: THREE.BufferGeometry; material: THREE.Material; items: Item[]; shadow?: boolean }) {
+export function Inst({ geo, material, items, shadow = true }: { geo: THREE.BufferGeometry; material: THREE.Material; items: Item[]; shadow?: boolean }) {
   const mesh = useMemo(() => {
     const m = new THREE.InstancedMesh(geo, material, items.length);
     const o = new THREE.Object3D();
@@ -70,7 +79,7 @@ function Inst({ geo, material, items, shadow = true }: { geo: THREE.BufferGeomet
   return <primitive object={mesh} />;
 }
 
-function Ground({ color, rough = 1 }: { color: string; rough?: number }) {
+export function Ground({ color, rough = 1 }: { color: string; rough?: number }) {
   const m = useMemo(() => mat(color, { roughness: rough }), [color, rough]);
   return (
     <mesh rotation-x={-Math.PI / 2} receiveShadow material={m}>
@@ -154,7 +163,7 @@ function useFirs(items: { x: number; z: number; s: number }[], green: string, sn
   }, [items, green, snow]);
 }
 
-function Firs({ items, green, snow }: { items: { x: number; z: number; s: number }[]; green: string; snow?: boolean }) {
+export function Firs({ items, green, snow }: { items: { x: number; z: number; s: number }[]; green: string; snow?: boolean }) {
   const f = useFirs(items, green, snow);
   return (
     <>
@@ -166,7 +175,7 @@ function Firs({ items, green, snow }: { items: { x: number; z: number; s: number
 }
 
 /** Случайные точки вне поляны вокруг персонажа и вне обзора перед ним */
-function scatter(seed: number, n: number, keep: (x: number, z: number) => boolean, area = { x: 26, z0: -32, z1: 8 }) {
+export function scatter(seed: number, n: number, keep: (x: number, z: number) => boolean, area = { x: 26, z0: -32, z1: 8 }) {
   const r = rng(seed);
   const out: { x: number; z: number; s: number }[] = [];
   for (let i = 0; out.length < n && i < n * 30; i++) {

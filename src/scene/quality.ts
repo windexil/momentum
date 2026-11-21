@@ -40,27 +40,18 @@ function startLevel(): QualityLevel {
   return "high";
 }
 
-const SAFE_KEY = "arttech-gpu-safe";
-function readSafe(): boolean {
-  try {
-    return localStorage.getItem(SAFE_KEY) === "1";
-  } catch {
-    return false;
+// Раньше был «щадящий» режим: после сбоя видеокарты он запоминался и включал
+// низкое качество. Режим убран — один раз сбрасываем то, что он сохранил.
+try {
+  if (localStorage.getItem("arttech-gpu-safe")) {
+    localStorage.removeItem("arttech-gpu-safe");
+    localStorage.setItem(KEY, "auto");
   }
+} catch {
+  /* нет доступа к хранилищу */
 }
 
-/**
- * Щадящий режим для слабых или капризных видеокарт: включается сам, если
- * браузер «потерял» WebGL. Без сглаживания, затенения и свечения, тени мельче.
- */
-const SAFE: QualitySettings = { dpr: 1, msaa: 0, ao: false, aoQuality: "performance", shadowSize: 512, bloom: false };
-
 interface QualityState {
-  /** щадящий режим после сбоя видеокарты */
-  safe: boolean;
-  setSafe: (v: boolean) => void;
-  /** без готовых 3D-моделей (котёнок, наушники): на некоторых ПК их загрузка роняет WebGL */
-  noModels: boolean;
   mode: QualityMode;
   /** текущий уровень в режиме «авто» */
   autoLevel: QualityLevel;
@@ -71,17 +62,6 @@ interface QualityState {
 }
 
 export const useQuality = create<QualityState>((set, get) => ({
-  safe: readSafe(),
-  noModels: false,
-  setSafe(safe) {
-    set({ safe });
-    try {
-      if (safe) localStorage.setItem(SAFE_KEY, "1");
-      else localStorage.removeItem(SAFE_KEY);
-    } catch {
-      /* ignore */
-    }
-  },
   mode: readMode(),
   autoLevel: startLevel(),
   level() {
@@ -109,6 +89,5 @@ export const useQuality = create<QualityState>((set, get) => ({
 /** Текущие настройки (реактивно). */
 export function useQualitySettings() {
   const lvl = useQuality((s) => (s.mode === "auto" ? s.autoLevel : s.mode));
-  const safe = useQuality((s) => s.safe);
-  return safe ? { level: "low" as QualityLevel, safe, ...SAFE } : { level: lvl, safe, ...QUALITY[lvl] };
+  return { level: lvl, ...QUALITY[lvl] };
 }

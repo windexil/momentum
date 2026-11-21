@@ -127,23 +127,14 @@ function SoundChip() {
 function QualityChip() {
   const mode = useQuality((s) => s.mode);
   const auto = useQuality((s) => s.autoLevel);
-  const safe = useQuality((s) => s.safe);
-  // после «низкой» идёт щадящая (для капризных видеокарт), потом снова «авто»
-  const next = () => {
-    const q = useQuality.getState();
-    if (q.safe) {
-      q.setSafe(false);
-      q.setMode("auto");
-    } else if (mode === "low") q.setSafe(true);
-    else q.setMode(Q_NEXT[mode]);
-  };
+  const next = () => useQuality.getState().setMode(Q_NEXT[mode]);
   return (
     <button
       className="ai-badge time-chip"
-      title="Качество графики. «Авто» само снижает нагрузку, если комната начинает тормозить; «щадящая» — для слабых видеокарт"
+      title="Качество графики. «Авто» само снижает нагрузку, если комната начинает тормозить"
       onClick={next}
     >
-      ⚙ Графика: {safe ? "щадящая" : mode === "auto" ? `авто (${Q_RU[auto]})` : Q_RU[mode]}
+      ⚙ Графика: {mode === "auto" ? `авто (${Q_RU[auto]})` : Q_RU[mode]}
     </button>
   );
 }

@@ -1,4 +1,4 @@
-// Пять демонстрационных воспоминаний с заметно разной атмосферой.
+// Восемь демонстрационных воспоминаний с заметно разной атмосферой.
 // Картинки нарисованы в SVG прямо здесь, музыка синтезируется, так что
 // всё содержимое демо собственное и без проблем с лицензиями.
 // Атмосфера считается тем же анализатором, что и для новых записей.
@@ -70,6 +70,30 @@ const cityNight = svg(`
 <g><rect x="300" y="150" width="4" height="100" fill="#555"/><circle cx="302" cy="148" r="9" fill="#ffe3a0"/><circle cx="302" cy="148" r="30" fill="#ffe3a0" opacity=".18"/></g>
 <rect x="180" y="120" width="70" height="20" rx="4" fill="#ff5fa2" opacity=".85"/>`);
 
+const concertNight = svg(`
+<rect width="400" height="300" fill="#140f24"/>
+<path d="M120 0 L40 220 L90 220 Z" fill="#ff4fa3" opacity=".35"/><path d="M200 0 L160 220 L240 220 Z" fill="#4fc3ff" opacity=".35"/><path d="M280 0 L310 220 L360 220 Z" fill="#b77bff" opacity=".35"/>
+<rect x="40" y="150" width="320" height="40" fill="#24203a"/><rect x="40" y="148" width="320" height="4" fill="#ff4fa3"/>
+<rect x="120" y="70" width="160" height="70" rx="4" fill="#ff8fc4" opacity=".7"/>
+<g fill="#0a0814">${Array.from({ length: 18 }, (_, i) => `<circle cx="${12 + i * 22}" cy="${238 + (i % 3) * 6}" r="13"/><rect x="${2 + i * 22}" y="${246 + (i % 3) * 6}" width="20" height="60" rx="8"/>`).join("")}</g>
+<rect x="96" y="214" width="3" height="20" fill="#7dffb0"/><rect x="250" y="210" width="3" height="20" fill="#7dffb0"/>`);
+
+const villageDay = svg(`
+<rect width="400" height="300" fill="#bfe3ff"/><circle cx="330" cy="60" r="30" fill="#fff3b0"/>
+<rect y="180" width="400" height="120" fill="#86b55a"/><rect y="170" width="400" height="16" fill="#e0c060"/>
+<rect x="60" y="110" width="130" height="80" fill="#b77a45"/><path d="M50 112 L125 60 L200 112 Z" fill="#b5483d"/>
+<rect x="80" y="130" width="34" height="30" fill="#ffe7a6" stroke="#f3ead8" stroke-width="5"/><rect x="138" y="130" width="34" height="30" fill="#ffe7a6" stroke="#f3ead8" stroke-width="5"/>
+<g stroke="#b58a5a" stroke-width="6">${Array.from({ length: 22 }, (_, i) => `<line x1="${8 + i * 18}" y1="200" x2="${8 + i * 18}" y2="232"/>`).join("")}</g>
+<g>${[250, 280, 310, 340].map((x) => `<line x1="${x}" y1="200" x2="${x}" y2="130" stroke="#5d8f3a" stroke-width="4"/><circle cx="${x}" cy="128" r="14" fill="#f2c12e"/><circle cx="${x}" cy="128" r="6" fill="#4a3020"/>`).join("")}</g>`);
+
+const mountainsView = svg(`
+<rect width="400" height="300" fill="#9fd0f0"/>
+<path d="M0 210 L70 90 L130 170 L200 60 L270 160 L330 100 L400 190 L400 300 L0 300 Z" fill="#6f7a8c"/>
+<path d="M200 60 L178 98 L196 92 L210 102 L224 90 Z M70 90 L55 116 L72 110 L86 118 Z M330 100 L316 124 L332 118 L346 126 Z" fill="#f5f8fc"/>
+<path d="M0 240 Q100 200 200 230 T400 225 L400 300 L0 300 Z" fill="#7f9a5a"/>
+<ellipse cx="260" cy="262" rx="70" ry="14" fill="#4f9cc4"/>
+<path d="M60 250 L80 220 L100 250 Z" fill="#f08a24"/>`);
+
 interface DemoSpec {
   id: string;
   date: string;
@@ -126,6 +150,33 @@ const SPECS: DemoSpec[] = [
     photos: [cityNight],
     photoColors: ["#1b1f3a", "#2b3157", "#ffd27a", "#ff5fa2"],
     preset: "rain",
+  },
+  {
+    id: "demo-concert",
+    date: "2025-09-20",
+    title: "Концерт любимой группы",
+    text: "Наконец попали на концерт! Стояли у самой сцены в толпе, прожекторы били в небо, весь зал пел вместе с музыкантами. Голос сорван, но это того стоило.",
+    photos: [concertNight],
+    photoColors: ["#140f24", "#ff4fa3", "#4fc3ff", "#b77bff"],
+    preset: "summer",
+  },
+  {
+    id: "demo-village",
+    date: "2025-06-28",
+    title: "Лето у бабушки",
+    text: "Неделя у бабушки в деревне: парное молоко, огород, подсолнухи у забора и яблоки прямо с дерева. Вечером пахло сеном и дымом из печной трубы.",
+    photos: [villageDay],
+    photoColors: ["#86b55a", "#f2c12e", "#b5483d", "#bfe3ff"],
+    preset: "summer",
+  },
+  {
+    id: "demo-mountains",
+    date: "2025-08-02",
+    title: "На вершине",
+    text: "Поднялись в горы до самого перевала. Внизу горное озеро, вокруг снежные вершины и скалы, ветер свистит. Устали, но вид стоил каждого шага.",
+    photos: [mountainsView],
+    photoColors: ["#9fd0f0", "#6f7a8c", "#f5f8fc", "#4f9cc4"],
+    preset: "winter",
   },
 ];
 

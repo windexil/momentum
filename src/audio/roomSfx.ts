@@ -34,6 +34,7 @@ export const useSfx = create<{ on: boolean; toggle: () => void }>((set, get) => 
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const MASTER = 0.7;
+const AMB = 0.55;
 
 /** Простой однополюсный фильтр нижних частот — для заготовки буферов. */
 function lowpass(d: Float32Array, k: number) {
@@ -48,6 +49,10 @@ class RoomSfx {
   private loop: { kind: Pet; gain: GainNode; pan: StereoPannerNode; src: AudioBufferSourceNode } | null = null;
   private duck = 1;
   private enabled = loadOn();
+  /** фон локации (волны, ветер, птицы, толпа) — свой выход, не приглушается музыкой */
+  private ambOut: GainNode | null = null;
+  private amb: { place: string; gain: GainNode; srcs: AudioScheduledSourceNode[]; timer: number } | null = null;
+  private wantAmb = "room";
 
   /** Браузер даёт звук только после действия пользователя — создаём контекст по первому клику. */
   unlock() {
@@ -57,6 +62,7 @@ class RoomSfx {
       this.setup(new AC());
     }
     if (this.ctx!.state === "suspended") void this.ctx!.resume();
+    if (this.wantAmb !== (this.amb?.place ?? "room")) this.setAmbience(this.wantAmb);
   }
 
   /** Отдельно, чтобы можно было отрендерить звуки в OfflineAudioContext для проверки. */
@@ -75,6 +81,10 @@ class RoomSfx {
     comp.ratio.value = 3;
     comp.attack.value = 0.01;
     this.out.connect(warm).connect(comp).connect(ctx.destination);
+    this.ambOut = ctx.createGain();
+    this.ambOut.gain.value = this.enabled ? AMB : 0;
+    this.ambOut.connect(warm);
+    this.amb = null;
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, len);
     const d = this.noise.getChannelData(0);
@@ -88,6 +98,7 @@ class RoomSfx {
   setEnabled(on: boolean) {
     this.enabled = on;
     if (this.out && this.ctx) this.out.gain.setTargetAtTime(on ? MASTER * this.duck : 0, this.ctx.currentTime, 0.05);
+    if (this.ambOut && this.ctx) this.ambOut.gain.setTargetAtTime(on ? AMB : 0, this.ctx.currentTime, 0.2);
   }
 
   /** Во время воспоминания звуки комнаты приглушаются, чтобы не мешать музыке. */
@@ -482,6 +493,128 @@ class RoomSfx {
     const now = ctx.currentTime;
     this.loop.gain.gain.setTargetAtTime(this.enabled ? level * vol : 0, now, 0.25);
     this.loop.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)) * 0.7, now, 0.1);
+  }
+
+  // ---------- фон локаций ----------
+
+  /** Петля шума через фильтр; возвращает узлы, чтобы ими можно было «дышать». */
+  private bed(dest: AudioNode, type: BiquadFilterType, f: number, q: number, vol: number, rate = 1) {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    src.playbackRate.value = rate;
+    const flt = ctx.createBiquadFilter();
+    flt.type = type;
+    flt.frequency.value = f;
+    flt.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(flt).connect(g).connect(dest);
+    src.start(ctx.currentTime, Math.random());
+    return { src, flt, g };
+  }
+
+  /** Медленное колебание параметра: волны набегают, ветер усиливается и стихает. */
+  private lfo(param: AudioParam, hz: number, depth: number) {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    o.frequency.value = hz;
+    const d = ctx.createGain();
+    d.gain.value = depth;
+    o.connect(d).connect(param);
+    o.start();
+    return o;
+  }
+
+  /** Птичья трель: несколько коротких свистов со скольжением вверх. */
+  private chirp(dest: AudioNode, t: number, vol: number) {
+    const base = rnd(2300, 3600), n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) this.tone(dest, t + i * rnd(0.09, 0.14), "sine", base, base * rnd(1.15, 1.4), 0.06, vol, 0.008);
+  }
+
+  /** Музыкальная шкатулка карусели: короткое арпеджио. */
+  private musicBox(dest: AudioNode, t: number) {
+    const notes = [523, 659, 784, 1047, 784, 659];
+    const k = Math.random() < 0.5 ? 1 : 0.89;
+    notes.forEach((f, i) => this.tone(dest, t + i * 0.22, "triangle", f * k, f * k, 0.35, 0.05, 0.005));
+  }
+
+  /** Включает фон для локации; «room» — тишина (у комнаты свои звуки). */
+  setAmbience(place: string) {
+    this.wantAmb = place;
+    if (!this.ctx || !this.ambOut || !this.noise) return;
+    if ((this.amb?.place ?? "room") === place) return;
+    const ctx = this.ctx;
+    if (this.amb) {
+      const old = this.amb;
+      old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+      window.clearInterval(old.timer);
+      window.setTimeout(() => old.srcs.forEach((s) => { try { s.stop(); } catch { /* уже остановлен */ } }), 3000);
+      this.amb = null;
+    }
+    if (place === "room") return;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.gain.setTargetAtTime(1, ctx.currentTime, 1.2);
+    gain.connect(this.ambOut);
+    const srcs: AudioScheduledSourceNode[] = [];
+    const add = <B extends { src: AudioBufferSourceNode }>(b: B) => (srcs.push(b.src), b);
+    const ev = gain; // события идут туда же
+    let tick: (t: number) => void = () => {};
+
+    if (place === "beach") {
+      // волны: низкий гул с медленным накатом и шипение пены
+      const low = add(this.bed(gain, "lowpass", 480, 0.6, 0.35, 0.7));
+      srcs.push(this.lfo(low.g.gain, 0.11, 0.25));
+      const hiss = add(this.bed(gain, "bandpass", 2400, 0.7, 0.06));
+      srcs.push(this.lfo(hiss.g.gain, 0.11, 0.05));
+      tick = (t) => { if (Math.random() < 0.02) this.chirp(ev, t, 0.03); };
+    } else if (place === "forest" || place === "park" || place === "village") {
+      const leaves = add(this.bed(gain, "lowpass", place === "park" ? 1400 : 900, 0.5, 0.12));
+      srcs.push(this.lfo(leaves.g.gain, 0.07, 0.06));
+      tick = (t) => {
+        if (Math.random() < 0.09) this.chirp(ev, t, 0.05);
+        // костёр потрескивает
+        if (place === "forest" && Math.random() < 0.35) this.burst(ev, t, { type: "highpass", f: 2600, dur: 0.02, peak: rnd(0.05, 0.16) });
+        // шуршание листьев под ногами в парке
+        if (place === "park" && Math.random() < 0.04) this.burst(ev, t, { type: "bandpass", f: 3000, q: 0.6, dur: 0.4, peak: 0.05, attack: 0.1 });
+      };
+    } else if (place === "mountains" || place === "winter" || place === "desert") {
+      // ветер: полоса шума, у которой «гуляет» высота и громкость
+      const f = place === "desert" ? 700 : place === "winter" ? 500 : 420;
+      const wind = add(this.bed(gain, "bandpass", f, 1.4, 0.3));
+      srcs.push(this.lfo(wind.flt.frequency, 0.06, f * 0.45));
+      srcs.push(this.lfo(wind.g.gain, 0.045, 0.18));
+      const body = add(this.bed(gain, "lowpass", 220, 0.5, 0.12));
+      srcs.push(this.lfo(body.g.gain, 0.03, 0.06));
+      tick = (t) => { if (place === "mountains" && Math.random() < 0.015) this.chirp(ev, t, 0.025); };
+    } else if (place === "city") {
+      add(this.bed(gain, "lowpass", 240, 0.5, 0.3));
+      tick = (t) => {
+        // проезжающая машина: шум нарастает и уходит
+        if (Math.random() < 0.05) this.burst(ev, t, { type: "bandpass", f: rnd(500, 900), q: 0.8, dur: 2.2, peak: 0.12, attack: 1.2 });
+        if (Math.random() < 0.006) {
+          this.tone(ev, t, "square", 392, 392, 0.25, 0.02, 0.01);
+          this.tone(ev, t, "square", 494, 494, 0.25, 0.015, 0.01);
+        }
+      };
+    } else if (place === "concert" || place === "fair") {
+      // гул толпы
+      add(this.bed(gain, "bandpass", 650, 0.8, place === "concert" ? 0.22 : 0.14));
+      const talk = add(this.bed(gain, "bandpass", 1300, 1.2, 0.08, 0.9));
+      srcs.push(this.lfo(talk.g.gain, 0.3, 0.04));
+      tick = (t) => {
+        // ликование: волна голосов
+        if (Math.random() < (place === "concert" ? 0.03 : 0.012)) this.burst(ev, t, { type: "bandpass", f: rnd(1200, 1800), q: 0.7, dur: 1.6, peak: 0.16, attack: 0.25 });
+        if (place === "fair" && Math.random() < 0.02) this.musicBox(ev, t);
+      };
+    }
+    const timer = window.setInterval(() => {
+      if (!this.ready) return;
+      tick(this.now());
+    }, 250);
+    this.amb = { place, gain, srcs, timer };
   }
 }
 

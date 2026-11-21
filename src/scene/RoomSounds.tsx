@@ -42,6 +42,11 @@ export function RoomSounds() {
     return [base / (1 + d * falloff), pan] as const;
   };
 
+  // фон локации: волны, ветер, птицы, гул города или толпы
+  const where = useStore((s) => s.place);
+  useEffect(() => sfx.setAmbience(where), [where]);
+  useEffect(() => () => sfx.setAmbience("room"), []);
+
   // настольная лампа щёлкает при включении/выключении
   useEffect(
     () =>

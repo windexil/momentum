@@ -14,7 +14,7 @@ export const PARTICLE_TYPES = [
 export type ParticleType = (typeof PARTICLE_TYPES)[number];
 
 /** Куда переносится персонаж, чтобы пережить день; room — остаться в комнате. */
-export const PLACES = ["room", "beach", "forest", "city", "winter"] as const;
+export const PLACES = ["room", "beach", "forest", "city", "winter", "mountains", "park", "village", "concert", "desert", "fair"] as const;
 export type Place = (typeof PLACES)[number];
 
 export interface Atmosphere {

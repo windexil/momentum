@@ -19,14 +19,13 @@ import { useStore } from "../store";
 import { diag } from "../diag";
 
 export function Scene() {
-  const safe = useQuality((s) => s.safe);
   return (
     <Canvas
       frameloop="demand"
-      shadows={!safe}
+      shadows
       dpr={1}
       camera={{ position: [9.6, 7.9, 9.6], fov: 36, near: 0.1, far: 80 }}
-      gl={{ antialias: false, powerPreference: safe ? "low-power" : "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+      gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       onCreated={({ gl }) => {
         // видеокарта может «потеряться» (сбой драйвера) — сообщаем интерфейсу
         const ctx = gl.getContext();
