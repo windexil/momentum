@@ -28,6 +28,7 @@ export default function App() {
     const lost = () => {
       if (tries++ < 2) {
         useQuality.getState().setSafe(true);
+        useQuality.setState({ noModels: true });
         useQuality.getState().setMode("low");
         setGl("retry");
         window.setTimeout(() => {

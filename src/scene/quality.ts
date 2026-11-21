@@ -59,6 +59,8 @@ interface QualityState {
   /** щадящий режим после сбоя видеокарты */
   safe: boolean;
   setSafe: (v: boolean) => void;
+  /** без готовых 3D-моделей (котёнок, наушники): на некоторых ПК их загрузка роняет WebGL */
+  noModels: boolean;
   mode: QualityMode;
   /** текущий уровень в режиме «авто» */
   autoLevel: QualityLevel;
@@ -70,6 +72,7 @@ interface QualityState {
 
 export const useQuality = create<QualityState>((set, get) => ({
   safe: readSafe(),
+  noModels: false,
   setSafe(safe) {
     set({ safe });
     try {

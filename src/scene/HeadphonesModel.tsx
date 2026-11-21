@@ -3,11 +3,18 @@
 // Цвета берутся из настроек персонажа: корпус — mats.hp, подушки — mats.hpPad.
 
 import { useGLTF } from "@react-three/drei";
+import { useQuality } from "./quality";
 import { useMemo } from "react";
 import * as THREE from "three";
 import url from "../assets/headphones.glb?url";
 
-export function HeadphonesModel({ body, pads }: { body: THREE.Material; pads: THREE.Material }) {
+export function HeadphonesModel(props: Parameters<typeof HeadphonesModelInner>[0]) {
+  const off = useQuality((q) => q.noModels);
+  if (off || import.meta.env.VITE_NOGLB) return null;
+  return <HeadphonesModelInner {...props} />;
+}
+
+function HeadphonesModelInner({ body, pads }: { body: THREE.Material; pads: THREE.Material }) {
   const { scene } = useGLTF(url);
   const obj = useMemo(() => {
     const o = scene.clone(true);
@@ -23,4 +30,3 @@ export function HeadphonesModel({ body, pads }: { body: THREE.Material; pads: TH
   return <primitive object={obj} scale={1.1} />;
 }
 
-useGLTF.preload(url);

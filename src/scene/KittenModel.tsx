@@ -3,6 +3,7 @@
 // сетка упрощена до ~24 тыс. треугольников, текстуры 1024px в WebP, сжатие meshopt.
 
 import { useGLTF } from "@react-three/drei";
+import { useQuality } from "./quality";
 import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import kittenUrl from "../assets/kitten.glb?url";
@@ -31,7 +32,13 @@ function Model() {
   return <primitive object={obj} scale={s} position-y={-BOTTOM * s} />;
 }
 
-export function KittenModel({ position, rotation = -0.35 }: { position: [number, number, number]; rotation?: number }) {
+export function KittenModel(props: Parameters<typeof KittenModelInner>[0]) {
+  const off = useQuality((q) => q.noModels);
+  if (off || import.meta.env.VITE_NOGLB) return null;
+  return <KittenModelInner {...props} />;
+}
+
+function KittenModelInner({ position, rotation = -0.35 }: { position: [number, number, number]; rotation?: number }) {
   return (
     // userData.dynamic: модель грузится позже комнаты, не склеиваем её со статикой
     <group position={position} rotation-y={rotation} userData={{ dynamic: true }}>
@@ -42,4 +49,3 @@ export function KittenModel({ position, rotation = -0.35 }: { position: [number,
   );
 }
 
-useGLTF.preload(kittenUrl);
