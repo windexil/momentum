@@ -7,7 +7,7 @@ import { useFrame } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { mergeStatic } from "./staticMerge";
-import { KittenModel } from "./KittenModel";
+import { KittenFigurine } from "./KittenFigurine";
 import * as THREE from "three";
 import { live } from "./live";
 import { props } from "./sceneState";
@@ -273,7 +273,7 @@ function Desk({ mats }: { mats: Mats }) {
       {/* книги стоят рядком между двумя подпорками, корешками в комнату */}
       <DeskBooks mats={mats} />
       {/* фигурка котёнка в наушниках слева от лампы */}
-      <KittenModel position={[0.64, 0.795, -0.27]} />
+      <KittenFigurine position={[0.64, 0.795, -0.27]} />
       {/* стул: выдвигается, когда персонаж садится за стол */}
       <DeskChair mats={mats} />
     </group>

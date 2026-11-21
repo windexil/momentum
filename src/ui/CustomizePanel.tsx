@@ -77,7 +77,7 @@ export function CustomizePanel() {
 
       <button className="ghost small reset" onClick={reset}>Сбросить всё</button>
       <p className="credits">
-        Авторы 3D-моделей: бумага страниц — «Paper», jacques_3D (CC BY 4.0, sketchfab.com/jacques_3D); наушники — «Headphones remake» (автор уточняется); фигурка котёнка — «Sims Cat Meme», Sketchfab.
+        Авторы 3D-моделей: бумага страниц — «Paper», jacques_3D (CC BY 4.0, sketchfab.com/jacques_3D).
       </p>
     </aside>
   );
