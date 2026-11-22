@@ -1,8 +1,7 @@
-# Публикует сайт на GitHub Pages при каждом пуше в main.
+# Публикация на GitHub Pages. Запускается вручную: аккаунт GitHub сейчас не может запускать Actions,
+# сайт собирает Vercel (vercel.json).
 name: Deploy to GitHub Pages
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
