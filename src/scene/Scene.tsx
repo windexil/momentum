@@ -39,6 +39,7 @@ export function Scene() {
       }}
     >
       <QualityRig />
+      <ShadowDiet />
       <FrameLimiter />
       <Suspense fallback={null}>
         <AtmosphereRig />
@@ -88,6 +89,33 @@ function InRoom({ children }: { children: ReactNode }) {
   return inRoom ? <>{children}</> : null;
 }
 
+/**
+ * Мелкие предметы (книжки, листики, кнопки) почти не дают заметной тени,
+ * а в проходе теней каждый — отдельный вызов отрисовки. Выключаем им тени
+ * после загрузки сцены и после каждого переноса в локацию.
+ */
+function ShadowDiet() {
+  const scene = useThree((s) => s.scene);
+  const place = useStore((s) => s.place);
+  useEffect(() => {
+    const sphere = new THREE.Sphere();
+    const scale = new THREE.Vector3();
+    const prune = () =>
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || !m.castShadow || (m as THREE.InstancedMesh).isInstancedMesh) return;
+        const g = m.geometry;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        sphere.copy(g.boundingSphere!);
+        m.getWorldScale(scale);
+        if (sphere.radius * Math.max(scale.x, scale.y, scale.z) < 0.09) m.castShadow = false;
+      });
+    const ids = [1500, 6000].map((ms) => window.setTimeout(prune, ms));
+    return () => ids.forEach((i) => window.clearTimeout(i));
+  }, [scene, place]);
+  return null;
+}
+
 /** Только в режиме разработки: доступ к камере из консоли и тестов. */
 function DevHandle() {
   const state = useThree();
@@ -107,7 +135,10 @@ function QualityRig() {
     <PerformanceMonitor
       bounds={() => [28, 50]}
       flipflops={3}
-      onDecline={() => q().decline()}
+      onDecline={() => {
+        // при открытом дневнике кадров специально меньше — это не повод снижать качество
+        if (useStore.getState().panel === "none") q().decline();
+      }}
       onIncline={() => q().incline()}
       onFallback={() => useQuality.setState({ autoLevel: "medium" })}
     />
@@ -125,7 +156,10 @@ function FrameLimiter() {
     let id = 0;
     const tick = (now: number) => {
       id = requestAnimationFrame(tick);
-      if (now - last.current >= 1000 / 60 - 2) {
+      // пока открыт дневник, форма записи или настройки, комната почти не видна —
+      // хватит 20 кадров в секунду, видеокарта и процессор отдыхают
+      const fps = useStore.getState().panel !== "none" ? 20 : 60;
+      if (now - last.current >= 1000 / fps - 2) {
         last.current = now;
         invalidate();
       }

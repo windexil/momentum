@@ -39,7 +39,7 @@ export function Loader() {
       <div className="loader-book">
         <div className="loader-page left">
           <svg className="loader-ink" viewBox="0 0 300 90" aria-hidden>
-            <text x="150" y="60" textAnchor="middle">ArtTech</text>
+            <text x="150" y="60" textAnchor="middle">Momentum</text>
           </svg>
           <div className="loader-sub">комната воспоминаний</div>
         </div>

@@ -18,26 +18,22 @@ export interface QualitySettings {
 export const QUALITY: Record<QualityLevel, QualitySettings> = {
   high: { dpr: 1.75, msaa: 4, ao: true, aoQuality: "medium", shadowSize: 2048, bloom: true },
   // почти как высокое: те же эффекты, только чуть меньше кадр и затенение попроще
-  medium: { dpr: 1.4, msaa: 4, ao: true, aoQuality: "low", shadowSize: 2048, bloom: true },
+  // затенение N8AO перерисовывает всю сцену ещё раз — на среднем его нет, это главный выигрыш в скорости
+  medium: { dpr: 1.25, msaa: 2, ao: false, aoQuality: "low", shadowSize: 2048, bloom: true },
   low: { dpr: 1, msaa: 2, ao: false, aoQuality: "performance", shadowSize: 1024, bloom: true },
 };
 
 const ORDER: QualityLevel[] = ["high", "medium", "low"];
 const KEY = "arttech-quality";
 
+/** Выбора качества в интерфейсе больше нет — всегда «авто», он сам подстраивается под FPS. */
 function readMode(): QualityMode {
-  try {
-    const v = localStorage.getItem(KEY);
-    if (v === "auto" || v === "high" || v === "medium" || v === "low") return v;
-  } catch {
-    /* нет доступа к хранилищу */
-  }
   return "auto";
 }
 
 function startLevel(): QualityLevel {
-  // телефоны и планшеты сразу начинают со среднего
-  return "high";
+  // «авто» начинает со среднего: красиво и без лишних проходов по сцене
+  return "medium";
 }
 
 // Раньше был «щадящий» режим: после сбоя видеокарты он запоминался и включал
@@ -105,12 +101,13 @@ export const useQuality = create<QualityState>((set, get) => ({
     }
   },
   decline() {
-    // авто опускается не ниже среднего; низкое — только вручную
-    if (get().autoLevel === "high") set({ autoLevel: "medium" });
+    // если тормозит — на ступень ниже (выбора в интерфейсе нет, всё решает «авто»)
+    const i = ORDER.indexOf(get().autoLevel);
+    if (i < ORDER.length - 1) set({ autoLevel: ORDER[i + 1] });
   },
   incline() {
-    const i = ORDER.indexOf(get().autoLevel);
-    if (i > 0) set({ autoLevel: ORDER[i - 1] });
+    // подниматься можно только до среднего: высокое заметно тяжелее, а разница в картинке мала
+    if (get().autoLevel === "low") set({ autoLevel: "medium" });
   },
 }));
 

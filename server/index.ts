@@ -130,7 +130,7 @@ if (process.env.NODE_ENV === "production" && fs.existsSync(dist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`ArtTech API: http://localhost:${PORT}  (Claude: ${hasKey ? MODEL : "нет ключа, работает локальный анализатор"})`);
+  console.log(`Momentum API: http://localhost:${PORT}  (Claude: ${hasKey ? MODEL : "нет ключа, работает локальный анализатор"})`);
 });
 
 function loadDotEnv() {

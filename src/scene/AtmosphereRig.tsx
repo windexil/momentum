@@ -128,7 +128,8 @@ export function AtmosphereRig() {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
     shadowTick.current++;
-    if (q.level !== "low" || shadowTick.current % 2 === 0) gl.shadowMap.needsUpdate = true;
+    // тени — 30 раз в секунду (на низком 20): глазу незаметно, а проход теней вдвое реже
+    if (shadowTick.current % (q.level === "low" ? 3 : 2) === 0) gl.shadowMap.needsUpdate = true;
     const { target, preview, phase } = useStore.getState();
     // Во время перелистывания альбома даём «намёк» на атмосферу страницы.
     // без воспоминания атмосферу задаёт время суток на часах

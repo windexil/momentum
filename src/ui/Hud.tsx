@@ -1,8 +1,6 @@
 import { useSfx } from "../audio/roomSfx";
 import { SERVICE_RU } from "../audio/embed";
-import { useQuality, type QualityLevel, type QualityMode } from "../scene/quality";
 import { useEffect, useState } from "react";
-import { checkAi } from "../atmosphere/analyze";
 import { useStore } from "../store";
 import { PARTICLE_RU } from "./NewMemoryForm";
 import { ActionBar, KeyHint } from "./Controls";
@@ -23,11 +21,6 @@ export function Hud() {
   const setHint = useStore((s) => s.setHint);
   const memories = useStore((s) => s.memories);
   const restoreDemos = useStore((s) => s.restoreDemos);
-  const [ai, setAi] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    checkAi().then(setAi);
-  }, []);
 
   useEffect(() => {
     if (!hint) return;
@@ -41,13 +34,7 @@ export function Hud() {
   return (
     <>
       <header className="brand">
-        <div className="logo">ArtTech</div>
-        <div className="sub">комната воспоминаний</div>
-        <div className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Атмосферу подбирает Claude на сервере" : "Сервер без ключа: работает локальный анализатор"}>
-          {ai === null ? "…" : ai ? "AI: Claude" : "AI: локальный анализ"}
-        </div>
         <TimeChip />
-        <QualityChip />
         <SoundChip />
       </header>
 
@@ -112,29 +99,12 @@ export function Hud() {
 }
 
 /** Время в комнате (как на настенных часах); клик — на час вперёд. */
-const Q_NEXT: Record<QualityMode, QualityMode> = { auto: "high", high: "medium", medium: "low", low: "auto" };
-const Q_RU: Record<QualityMode | QualityLevel, string> = { auto: "авто", high: "высокая", medium: "средняя", low: "низкая" };
 
 function SoundChip() {
   const on = useSfx((s) => s.on);
   return (
     <button className="ai-badge time-chip" title="Звуки комнаты: шаги, часы, кот" onClick={() => useSfx.getState().toggle()}>
       {on ? "🔊 Звуки" : "🔇 Звуки выкл."}
-    </button>
-  );
-}
-
-function QualityChip() {
-  const mode = useQuality((s) => s.mode);
-  const auto = useQuality((s) => s.autoLevel);
-  const next = () => useQuality.getState().setMode(Q_NEXT[mode]);
-  return (
-    <button
-      className="ai-badge time-chip"
-      title="Качество графики. «Авто» само снижает нагрузку, если комната начинает тормозить"
-      onClick={next}
-    >
-      ⚙ Графика: {mode === "auto" ? `авто (${Q_RU[auto]})` : Q_RU[mode]}
     </button>
   );
 }

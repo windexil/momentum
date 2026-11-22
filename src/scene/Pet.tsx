@@ -121,6 +121,9 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   const legs = useRef<THREE.Group[]>([]);
   const [bubble, setBubble] = useState<PetState>("idle");
   const [menu, setMenu] = useState(false);
+  // эмоции питомца (z z z, ноты) не показываем поверх дневника, формы записи и вида из-за стола
+  const panel = useStore((s) => s.panel);
+  const [fp, setFp] = useState(false);
   useEffect(() => {
     if (!menu) return;
     const close = (e: PointerEvent) => {
@@ -168,6 +171,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
   const tmp = useMemo(() => ({ target: new THREE.Vector3(), d: new THREE.Vector3() }), []);
 
   useFrame(({ clock }, rawDt) => {
+    if (hero.firstPerson !== fp) setFp(hero.firstPerson);
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
     const chosen = useAvatar.getState().avatar.petMood;
@@ -511,7 +515,7 @@ function PetBody({ kind }: { kind: Exclude<PetKind, "none"> }) {
             </mesh>
           ))}
           {ears}
-          {BUBBLE[bubble] && (
+          {BUBBLE[bubble] && panel === "none" && !fp && (
             <Html position={[0, 0.3, 0]} center distanceFactor={7} zIndexRange={[5, 0]}>
               <div className={`pet-bubble mood-${bubble}`}>{BUBBLE[bubble]}</div>
             </Html>
