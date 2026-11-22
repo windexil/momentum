@@ -216,7 +216,7 @@ export class SynthPlayer {
     bp.frequency.value = 2500;
     bp.Q.value = 0.4;
     const g = this.ctx.createGain();
-    g.gain.value = 0.05;
+    g.gain.value = 0.018; // дождь — тихим фоном, не громче музыки
     src.connect(bp).connect(g).connect(this.out);
     src.start();
     this.noise = src;

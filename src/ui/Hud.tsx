@@ -36,6 +36,7 @@ export function Hud() {
       <header className="brand">
         <TimeChip />
         <SoundChip />
+        <ClockChip />
       </header>
 
       {phase === "idle" && panel === "none" && (
@@ -105,6 +106,15 @@ function SoundChip() {
   return (
     <button className="ai-badge time-chip" title="Звуки комнаты: шаги, часы, кот" onClick={() => useSfx.getState().toggle()}>
       {on ? "🔊 Звуки" : "🔇 Звуки выкл."}
+    </button>
+  );
+}
+
+function ClockChip() {
+  const clock = useSfx((s) => s.clock);
+  return (
+    <button className="ai-badge time-chip" title="Тиканье настенных часов" onClick={() => useSfx.getState().toggleClock()}>
+      {clock ? "🕰 Тиканье" : "🕰 Тиканье выкл."}
     </button>
   );
 }

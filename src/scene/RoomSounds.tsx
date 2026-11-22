@@ -5,7 +5,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { sfx } from "../audio/roomSfx";
+import { sfx, useSfx } from "../audio/roomSfx";
 import { useAvatar } from "../avatar";
 import { useRoom } from "../roomStore";
 import { useStore } from "../store";
@@ -78,7 +78,7 @@ export function RoomSounds() {
     if (sec !== s.sec) {
       s.sec = sec;
       // в локации воспоминания часов нет
-      if (useStore.getState().place === "room") {
+      if (useStore.getState().place === "room" && useSfx.getState().clock) {
         const [v, pan] = place(CLOCK, 0.3, 0.35);
         sfx.tick(sec % 2 === 1, v, pan);
       }

@@ -18,8 +18,28 @@ function loadOn() {
 }
 
 /** Включены ли звуки комнаты (кнопка в шапке). */
-export const useSfx = create<{ on: boolean; toggle: () => void }>((set, get) => ({
+const CLOCK_KEY = "arttech-clock";
+function loadClock() {
+  try {
+    return localStorage.getItem(CLOCK_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** Включены ли звуки комнаты (кнопка в шапке) и тиканье часов (отдельная кнопка). */
+export const useSfx = create<{ on: boolean; clock: boolean; toggle: () => void; toggleClock: () => void }>((set, get) => ({
   on: loadOn(),
+  clock: loadClock(),
+  toggleClock() {
+    const clock = !get().clock;
+    try {
+      localStorage.setItem(CLOCK_KEY, clock ? "on" : "off");
+    } catch {
+      /* приватный режим */
+    }
+    set({ clock });
+  },
   toggle() {
     const on = !get().on;
     try {
@@ -34,7 +54,7 @@ export const useSfx = create<{ on: boolean; toggle: () => void }>((set, get) => 
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const MASTER = 0.7;
-const AMB = 0.55;
+const AMB = 0.25; // фон локаций (волны, ветер, толпа) — едва слышно, под музыкой
 
 /** Простой однополюсный фильтр нижних частот — для заготовки буферов. */
 function lowpass(d: Float32Array, k: number) {
@@ -163,33 +183,19 @@ class RoomSfx {
   // ---------- комната ----------
 
   /**
-   * Шаг ботинком по деревянному полу: удар каблука, через миг перекат на носок,
-   * глухой гул доски под ногой и изредка её скрип. По ковру — мягкий приглушённый шаг.
+   * Мультяшный шаг: мягкое «пум» с лёгким понижением тона, левая и правая нога звучат
+   * чуть по-разному. Никаких щелчков — только круглый тёплый звук. По ковру ещё тише.
    */
+  private foot = 0;
   step(soft: boolean, vol: number, pan: number) {
     if (!this.ready) return;
     const t = this.now();
-    const d = this.chain(vol, pan);
-    if (soft) {
-      this.burst(d, t, { type: "lowpass", f: 380, dur: 0.11, peak: 0.3, attack: 0.015 });
-      this.tone(d, t, "sine", 85, 60, 0.08, 0.12, 0.01);
-      return;
-    }
-    // каблук: плотный щелчок твёрдой подошвы + низкий удар
-    this.burst(d, t, { type: "bandpass", f: rnd(1500, 1900), q: 1.4, dur: 0.025, peak: 0.55, attack: 0.002 });
-    this.burst(d, t, { type: "lowpass", f: rnd(900, 1100), dur: 0.06, peak: 0.45, attack: 0.003 });
-    this.tone(d, t, "sine", rnd(105, 125), 55, 0.09, 0.45, 0.003);
-    // доска отзывается полым деревянным гулом
-    this.burst(d, t + 0.004, { type: "bandpass", f: rnd(210, 260), q: 7, dur: 0.14, peak: 0.5, attack: 0.004 });
-    // перекат на носок — тише и чуть звонче
-    const toe = t + rnd(0.075, 0.095);
-    this.burst(d, toe, { type: "bandpass", f: rnd(1100, 1400), q: 1.2, dur: 0.03, peak: 0.25, attack: 0.003 });
-    this.burst(d, toe, { type: "bandpass", f: rnd(300, 360), q: 5, dur: 0.07, peak: 0.18, attack: 0.004 });
-    // половица иногда скрипит
-    if (Math.random() < 0.12) {
-      const c = t + 0.05;
-      this.tone(d, c, "sawtooth", rnd(520, 640), rnd(430, 520), 0.16, 0.025, 0.04);
-    }
+    const d = this.chain(vol * (soft ? 0.22 : 0.35), pan);
+    this.foot ^= 1;
+    const f = (this.foot ? 210 : 180) * rnd(0.96, 1.04) * (soft ? 0.8 : 1);
+    this.tone(d, t, "sine", f, f * 0.62, 0.09, 0.5, 0.012);
+    this.tone(d, t, "triangle", f * 2, f * 1.3, 0.04, 0.06, 0.01);
+    this.burst(d, t, { type: "lowpass", f: soft ? 260 : 420, dur: 0.06, peak: 0.12, attack: 0.012 });
   }
 
   /** Кружка стукнула о столик или ладонь: короткий керамический «дзынь». */
