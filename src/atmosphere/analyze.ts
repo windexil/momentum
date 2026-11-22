@@ -1,7 +1,7 @@
 // Клиент анализа: сначала пробуем Claude через наш сервер,
 // при любой ошибке (нет ключа, нет сети) используем локальный анализатор.
 
-import { analyzeLocally } from "./localAnalyzer";
+import { analyzeLocally, dayTitle } from "./localAnalyzer";
 import { sanitizeAtmosphere } from "./sanitize";
 import type { AnalyzeInput, AnalyzeResult } from "./types";
 
@@ -33,7 +33,10 @@ export async function analyzeMemory(input: AnalyzeInput): Promise<AnalyzeResult>
       clearTimeout(timer);
       if (r.ok) {
         const j = await r.json();
-        return { atmosphere: sanitizeAtmosphere(j.atmosphere), source: "claude" };
+        const atmosphere = sanitizeAtmosphere(j.atmosphere);
+        // название дня всегда по одному правилу, чтобы все папки звучали в одном тоне
+        atmosphere.title = dayTitle(input, atmosphere.place ?? "room");
+        return { atmosphere, source: "claude" };
       }
     } catch (e) {
       console.warn("Claude недоступен, используем локальный анализ", e);

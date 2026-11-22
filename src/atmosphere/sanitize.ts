@@ -49,5 +49,6 @@ export function sanitizeAtmosphere(raw: Partial<Atmosphere> | null | undefined):
     lampColor: hex(r.lampColor, d.lampColor),
     nightSky: typeof r.nightSky === "boolean" ? r.nightSky : d.nightSky,
     place: PLACES.includes(r.place as Place) ? (r.place as Place) : "room",
+    ...(typeof r.title === "string" && r.title.trim() ? { title: r.title.trim().slice(0, 80) } : {}),
   };
 }

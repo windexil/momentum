@@ -778,3 +778,5 @@ input[type=file]::file-selector-button {
 .nogl-diag{margin-top:14px;font-size:12px;opacity:.85}
 .nogl-diag summary{cursor:pointer}
 .nogl-diag pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;background:rgba(0,0,0,.08);padding:8px;border-radius:6px;font-family:ui-monospace,monospace;font-size:11px;line-height:1.35;margin:6px 0 0}
+
+.folder-name { font-size: 1.05rem; margin: 0 0 10px; }

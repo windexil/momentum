@@ -10,6 +10,7 @@ import { hexToRgb, hsl, mixHex, rgbToHsl, tint } from "./color";
 import type { AnalyzeInput, Atmosphere, ParticleType } from "./types";
 import { MOODS, type MoodId } from "./moods";
 import { detectPlace } from "./place";
+import { makeDayTitle } from "./title";
 
 interface Theme {
   id: string;
@@ -194,6 +195,7 @@ export function analyzeLocally(input: AnalyzeInput): Atmosphere {
     lampColor: tint(hsl(baseHue, 0.7, 0.72), warmth),
     nightSky: night,
     place: detectPlace(`${input.title} ${input.text}`),
+    title: dayTitle(input, detectPlace(`${input.title} ${input.text}`)),
   };
 }
 
@@ -203,4 +205,14 @@ function describe(valence: number, energy: number, warmth: number, night: boolea
   const feel = valence > 0.4 ? "чтобы вернуть ощущение счастья" : valence < -0.2 ? "чтобы бережно прожить эту грусть" : "чтобы задержаться в этом моменте";
   const about = themes.length ? `В тексте слышны ${themes.join(", ")}: ` : "";
   return `${about}${light}, ${pace}, ${feel}.`;
+}
+
+/** Темы текста по убыванию силы (id), для названия дня. */
+export function dayThemes(text: string): string[] {
+  return detectThemes(text).map((h) => h.theme.id);
+}
+
+/** Название папки дня по единому правилу «Место, время и деталь». */
+export function dayTitle(input: Pick<AnalyzeInput, "text" | "date">, place: NonNullable<Atmosphere["place"]>): string {
+  return makeDayTitle({ text: input.text, place, themes: dayThemes(input.text), date: input.date });
 }

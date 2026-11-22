@@ -66,6 +66,8 @@ export interface Atmosphere {
   nightSky: boolean;
   /** Локация воспоминания (у старых записей может не быть). */
   place?: Place;
+  /** Название папки дня, придуманное системой (см. title.ts). */
+  title?: string;
 }
 
 export const NEUTRAL_ATMOSPHERE: Atmosphere = {
@@ -110,6 +112,8 @@ export interface AnalyzeInput {
   /** Уменьшенные фото (data URL jpeg) для анализа моделью. */
   photoThumbs: string[];
   audio: AudioFeatures | null;
+  /** ISO-дата дня: подсказывает сезон для названия. */
+  date?: string;
 }
 
 export interface AnalyzeResult {

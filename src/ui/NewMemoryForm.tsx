@@ -126,6 +126,7 @@ export function NewMemoryForm() {
         photoColors: colors,
         photoThumbs: thumbs,
         audio: audioFeatures,
+        date,
       });
 
       if (music.kind === "synth") {
@@ -136,7 +137,7 @@ export function NewMemoryForm() {
       const memory: Memory = {
         id: uid(),
         date,
-        title: title.trim() || "Без названия",
+        title: title.trim() || result.atmosphere.title || "Без названия",
         text: text.trim(),
         photos,
         music,
@@ -161,6 +162,7 @@ export function NewMemoryForm() {
         <div className="modal">
           <h2>День сохранён в альбом</h2>
           <div className="result">
+            <p className="folder-name">📁 Папка дня: <b>«{saved.title}»</b></p>
             <div className="swatches big">{a.palette.map((c, i) => <span key={i} style={{ background: c }} />)}</div>
             <p><b>{a.mood}</b></p>
             <p className="muted">{a.description}</p>
@@ -191,7 +193,7 @@ export function NewMemoryForm() {
           </label>
           <label className="field">
             <span>Название дня</span>
-            <input value={title} placeholder="Например: Первый снег" onChange={(e) => setTitle(e.target.value)} />
+            <input value={title} placeholder="Оставьте пустым — система придумает сама" onChange={(e) => setTitle(e.target.value)} />
           </label>
         </div>
         <label className="field">
