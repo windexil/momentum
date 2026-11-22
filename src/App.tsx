@@ -11,6 +11,8 @@ import { NewMemoryForm } from "./ui/NewMemoryForm";
 import { StripEditor } from "./ui/StripEditor";
 import { useHeroUI } from "./scene/heroControl";
 import { hasWebGL, NoWebGL, SceneBoundary } from "./ui/NoWebGL";
+import { useQuality } from "./scene/quality";
+import { diag } from "./diag";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -26,6 +28,9 @@ export default function App() {
     let tries = 0;
     const lost = () => {
       if (tries++ < 2) {
+        // по очереди выключаем то, что чаще всего роняет видеокарту: отражения, потом постобработку
+        const fx = useQuality.getState().fxDown();
+        diag(`перезапуск 3D, выключено: ${fx >= 2 ? "отражения и постобработка" : "отражения"}`);
         setGl("retry");
         window.setTimeout(() => {
           setSceneKey((k) => k + 1);

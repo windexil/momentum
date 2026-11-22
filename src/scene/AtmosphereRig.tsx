@@ -6,7 +6,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
 import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef } from "react";
-import { useQualitySettings } from "./quality";
+import { useQuality, useQualitySettings } from "./quality";
 import * as THREE from "three";
 import { audio } from "../audio/engine";
 import { useStore } from "../store";
@@ -43,6 +43,7 @@ export function AtmosphereRig() {
   const hs = useRef<HSEffectLike>(null);
   const { scene, gl } = useThree();
   const q = useQualitySettings();
+  const fx = useQuality((s) => s.fx);
   // смена размера карты теней: старую карту нужно выбросить, она пересоздастся
   useEffect(() => {
     const k = key.current;
@@ -297,12 +298,15 @@ export function AtmosphereRig() {
       <mesh geometry={beamGeo} material={beamMat} />
       </group>
       {/* окружение для отражений на лакированном дереве и металле — без загрузки файлов */}
+      {fx < 1 && (
       <Environment resolution={128} frames={1}>
         <Lightformer form="rect" intensity={3} color="#fff4e2" position={[0.6, 3, -6]} scale={[4, 3, 1]} />
         <Lightformer form="rect" intensity={1.2} color="#ffe9cf" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} />
         <Lightformer form="rect" intensity={0.6} color="#cfdcff" position={[8, 2, 4]} rotation-y={-Math.PI / 2} scale={[8, 4, 1]} />
         <Lightformer form="rect" intensity={0.35} color="#b98d63" position={[0, -3, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} />
       </Environment>
+      )}
+      {fx < 2 && (
       <EffectComposer key={q.level} multisampling={q.msaa} enableNormalPass={false}>
         {/* затенение в углах и под предметами (на низком качестве выключено) */}
         <>{q.ao && <N8AO halfRes quality={q.aoQuality} aoRadius={0.45} distanceFalloff={0.6} intensity={2.2} color="#2a1c12" />}</>
@@ -311,6 +315,7 @@ export function AtmosphereRig() {
         <BrightnessContrast ref={bc as never} contrast={0} brightness={0} />
         <Vignette ref={vignette as never} offset={0.28} darkness={0.5} />
       </EffectComposer>
+      )}
     </>
   );
 }

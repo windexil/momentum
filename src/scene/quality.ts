@@ -51,7 +51,24 @@ try {
   /* нет доступа к хранилищу */
 }
 
+const FX_KEY = "arttech-gpu-fx";
+function readFx(): number {
+  try {
+    const v = Number(localStorage.getItem(FX_KEY));
+    return v === 1 || v === 2 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
 interface QualityState {
+  /**
+   * Что выключено после сбоя видеокарты (запоминается для этого браузера):
+   * 0 — всё включено, 1 — без отражений окружения, 2 — ещё и без постобработки.
+   */
+  fx: number;
+  /** сбой видеокарты: выключаем следующую тяжёлую часть графики */
+  fxDown: () => number;
   mode: QualityMode;
   /** текущий уровень в режиме «авто» */
   autoLevel: QualityLevel;
@@ -62,6 +79,17 @@ interface QualityState {
 }
 
 export const useQuality = create<QualityState>((set, get) => ({
+  fx: readFx(),
+  fxDown() {
+    const fx = Math.min(2, get().fx + 1);
+    set({ fx });
+    try {
+      localStorage.setItem(FX_KEY, String(fx));
+    } catch {
+      /* ignore */
+    }
+    return fx;
+  },
   mode: readMode(),
   autoLevel: startLevel(),
   level() {
