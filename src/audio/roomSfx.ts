@@ -162,17 +162,85 @@ class RoomSfx {
 
   // ---------- комната ----------
 
-  /** Шаг: по дереву — мягкий глухой «тук», по ковру — едва слышно. */
+  /**
+   * Шаг ботинком по деревянному полу: удар каблука, через миг перекат на носок,
+   * глухой гул доски под ногой и изредка её скрип. По ковру — мягкий приглушённый шаг.
+   */
   step(soft: boolean, vol: number, pan: number) {
     if (!this.ready) return;
     const t = this.now();
     const d = this.chain(vol, pan);
     if (soft) {
-      this.burst(d, t, { type: "lowpass", f: 320, dur: 0.1, peak: 0.25, attack: 0.02 });
-    } else {
-      this.burst(d, t, { type: "lowpass", f: rnd(600, 800), dur: 0.07, peak: 0.35, attack: 0.006 });
-      this.tone(d, t, "sine", rnd(95, 115), 60, 0.07, 0.25, 0.005);
+      this.burst(d, t, { type: "lowpass", f: 380, dur: 0.11, peak: 0.3, attack: 0.015 });
+      this.tone(d, t, "sine", 85, 60, 0.08, 0.12, 0.01);
+      return;
     }
+    // каблук: плотный щелчок твёрдой подошвы + низкий удар
+    this.burst(d, t, { type: "bandpass", f: rnd(1500, 1900), q: 1.4, dur: 0.025, peak: 0.55, attack: 0.002 });
+    this.burst(d, t, { type: "lowpass", f: rnd(900, 1100), dur: 0.06, peak: 0.45, attack: 0.003 });
+    this.tone(d, t, "sine", rnd(105, 125), 55, 0.09, 0.45, 0.003);
+    // доска отзывается полым деревянным гулом
+    this.burst(d, t + 0.004, { type: "bandpass", f: rnd(210, 260), q: 7, dur: 0.14, peak: 0.5, attack: 0.004 });
+    // перекат на носок — тише и чуть звонче
+    const toe = t + rnd(0.075, 0.095);
+    this.burst(d, toe, { type: "bandpass", f: rnd(1100, 1400), q: 1.2, dur: 0.03, peak: 0.25, attack: 0.003 });
+    this.burst(d, toe, { type: "bandpass", f: rnd(300, 360), q: 5, dur: 0.07, peak: 0.18, attack: 0.004 });
+    // половица иногда скрипит
+    if (Math.random() < 0.12) {
+      const c = t + 0.05;
+      this.tone(d, c, "sawtooth", rnd(520, 640), rnd(430, 520), 0.16, 0.025, 0.04);
+    }
+  }
+
+  /** Кружка стукнула о столик или ладонь: короткий керамический «дзынь». */
+  mug(vol: number, pan: number) {
+    if (!this.ready) return;
+    const t = this.now();
+    const d = this.chain(vol, pan);
+    this.burst(d, t, { type: "bandpass", f: 2600, q: 3, dur: 0.012, peak: 0.4, attack: 0.001 });
+    this.tone(d, t, "sine", 2350, 2330, 0.12, 0.09, 0.002);
+    this.tone(d, t, "sine", 3720, 3700, 0.07, 0.05, 0.002);
+    this.tone(d, t, "sine", 160, 120, 0.04, 0.2, 0.002);
+  }
+
+  /** Глоток горячего какао: осторожное прихлёбывание, потом тихое «глк». */
+  sip(vol: number, pan: number) {
+    if (!this.ready) return;
+    const ctx = this.ctx!;
+    const t = this.now();
+    const d = this.chain(vol, pan);
+    // втягивание: шипящий шум, фильтр ползёт вверх, громкость дрожит (пузырьки)
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 2.5;
+    f.frequency.setValueAtTime(700, t);
+    f.frequency.exponentialRampToValueAtTime(1700, t + 0.45);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.08);
+    g.gain.setValueAtTime(0.22, t + 0.35);
+    g.gain.linearRampToValueAtTime(0, t + 0.5);
+    const wob = ctx.createOscillator();
+    wob.frequency.value = 23;
+    const wg = ctx.createGain();
+    wg.gain.value = 0.09;
+    wob.connect(wg).connect(g.gain);
+    src.connect(f).connect(g).connect(d);
+    src.start(t, Math.random());
+    src.stop(t + 0.55);
+    wob.start(t);
+    wob.stop(t + 0.55);
+    // пара пузырьков
+    for (let i = 0; i < 3; i++) this.tone(d, t + 0.12 + i * rnd(0.08, 0.12), "sine", rnd(900, 1300), rnd(1500, 1900), 0.03, 0.05, 0.003);
+    // глоток
+    const gl = t + 0.75;
+    this.tone(d, gl, "sine", 340, 150, 0.09, 0.35, 0.006);
+    this.burst(d, gl, { type: "lowpass", f: 450, dur: 0.06, peak: 0.25, attack: 0.005 });
+    // довольный выдох
+    this.burst(d, gl + 0.35, { type: "bandpass", f: 900, q: 0.7, dur: 0.4, peak: 0.07, attack: 0.12 });
   }
 
   /** Тик-так настенных часов: деревянный, приглушённый. */

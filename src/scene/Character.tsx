@@ -34,6 +34,8 @@ export const hero = {
   /** фаза шага и сила ходьбы (для звука шагов) */
   walk: 0,
   moveAmt: 0,
+  /** 0..1 — фаза «попить какао» (для звуков кружки и глотков) */
+  drink: 0,
   /** счётчик мгновенных переносов: камера по нему прыгает следом, а не плывёт */
   teleports: 0,
 };
@@ -395,6 +397,7 @@ export function Character() {
     hero.pose = control.pose;
     hero.sit = st.sit;
     hero.lie = st.lie;
+    hero.drink = st.drink;
     hero.desk = st.desk;
     hero.moving = speed > 0.15;
     hero.listening = listening;

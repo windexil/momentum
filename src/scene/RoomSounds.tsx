@@ -29,6 +29,7 @@ export function RoomSounds() {
     sit: 0,
     lie: 0,
     desk: 0,
+    drink: 0,
     mode: "",
     nextMeow: 40 + Math.random() * 40,
   });
@@ -96,6 +97,16 @@ export function RoomSounds() {
     if (hero.desk > 0.6 && s.desk <= 0.6) sfx.sitWood(hv, hpan);
     if (hero.lie > 0.3 && s.lie <= 0.3) sfx.rustle(hv, hpan);
     if (hero.lie < 0.7 && s.lie >= 0.7) sfx.rustle(hv * 0.8, hpan);
+    // ---- какао: кружку взяли, глоток, поставили обратно
+    const dk = hero.drink;
+    if (dk !== s.drink) {
+      const pd = s.drink;
+      const cross = (x: number) => pd < x && dk >= x;
+      if (cross(0.17)) sfx.mug(hv * 0.8, hpan);
+      if (cross(0.42)) sfx.sip(hv, hpan);
+      if (cross(0.97) || (pd > 0.9 && pd < 0.97 && dk === 0)) sfx.mug(hv * 0.9, hpan);
+      s.drink = dk;
+    }
     s.sit = hero.sit;
     s.desk = hero.desk;
     s.lie = hero.lie;
