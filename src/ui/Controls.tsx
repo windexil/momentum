@@ -2,46 +2,16 @@
 // Ходьба только кликом или тапом по полу.
 
 import { useEffect, useState } from "react";
-import { HP_PLACES, heroCmd, useHeroUI } from "../scene/heroControl";
 import { useStore } from "../store";
-import { useAvatar } from "../avatar";
-import { petCmd } from "../scene/Pet";
 
+/** Справа только кнопка возврата из воспоминания. В комнате всё делается кликом по предметам. */
 export function ActionBar() {
-  const { pose, hp } = useHeroUI();
-  const phase = useStore((s) => s.phase);
   const stop = useStore((s) => s.stopReliving);
-  const listening = phase === "listening";
-  const hasPet = useAvatar((s) => s.avatar.pet !== "none");
-  // кладём туда, где персонаж сейчас: за столом — на стол, в кровати — на кровать
-  const near = pose === "lie" ? "bed" : "side";
   const inRoom = useStore((s) => s.place === "room");
-
-  // в локации воспоминания одно действие: вернуться домой
-  if (!inRoom)
-    return (
-      <div className="actions">
-        <button onClick={() => stop()}>🏠 Вернуться в комнату</button>
-      </div>
-    );
-
+  if (inRoom) return null;
   return (
     <div className="actions">
-      {pose !== "sit" && <button onClick={() => heroCmd.sit()}>🪑 Сесть</button>}
-      {pose !== "lie" && <button onClick={() => heroCmd.lie()}>🛏 Лечь</button>}
-      {pose !== "desk" && <button onClick={() => heroCmd.desk()}>✍️ За стол</button>}
-      {pose !== "stand" && <button onClick={() => heroCmd.stand()}>🚶 Встать</button>}
-      <button onClick={() => heroCmd.drink()}>☕ Попить какао</button>
-      <button onClick={() => heroCmd.toggleLamp()}>💡 Торшер</button>
-      {hasPet && <button onClick={() => petCmd.call()}>🐾 Позвать питомца</button>}
-      {hp === "table" && <button onClick={() => heroCmd.takeHp()}>🎧 Взять наушники</button>}
-      {hp === "neck" && <button onClick={() => heroCmd.wearHp()}>🎧 Надеть</button>}
-      {hp === "head" && (
-        <button onClick={() => (listening ? stop() : heroCmd.removeHp())}>🎧 Снять</button>
-      )}
-      {hp !== "table" && !listening && (
-        <button onClick={() => heroCmd.putBackHp(near)}>↩ Положить {HP_PLACES[near].name}</button>
-      )}
+      <button onClick={() => stop()}>🏠 Вернуться в комнату</button>
     </div>
   );
 }
@@ -55,7 +25,7 @@ export function KeyHint() {
   if (!show) return null;
   return (
     <div className="keyhint">
-      <b>Клик</b> или <b>тап</b> по полу — идти туда · по креслу, кровати, столу, торшеру, наушникам или кружке — действие · клик по часам — +1 час
+      <b>Клик</b> или <b>тап</b> по полу — идти туда · по креслу, кровати, столу, торшеру, наушникам, кружке или питомцу — действие · клик по часам — +1 час
     </div>
   );
 }
