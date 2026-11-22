@@ -5,7 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoom } from "../roomStore";
-import { AlbumBook } from "../ui/AlbumBook";
 import { useHeroUI } from "./heroControl";
 import * as THREE from "three";
 import { useStore } from "../store";
@@ -167,13 +166,6 @@ export function Album3D() {
           <boxGeometry args={[0.025, 0.035, 0.05]} />
         </mesh>
       </group>
-      {open && atDesk && (
-        <Html transform position={[0.31, 0.1, 0]} rotation-x={-Math.PI / 2} scale={0.04} zIndexRange={[20, 0]}>
-          <div onPointerDown={(e) => e.stopPropagation()}>
-            <AlbumBook onDesk />
-          </div>
-        </Html>
-      )}
       {hovered && !open && !atDesk && (
         <Html position={[0, 0.35, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
           <div className="tag">Альбом воспоминаний</div>

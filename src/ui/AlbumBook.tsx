@@ -12,6 +12,7 @@ const FLIP_MS = 950;
 const CLOSE_MS = 340;
 const COVER_MS = 750;
 
+/** onDesk — альбом открыт за столом: обложка уже раскрыта 3D-книгой, сразу видны страницы. Вид и размер — как обычно. */
 export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   const memories = useStore((s) => s.memories);
   const setPanel = useStore((s) => s.setPanel);
@@ -35,7 +36,6 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
 
   function close() {
     if (closing) return;
-    if (onDesk) return setPanel("none");
     setClosing(true);
     window.setTimeout(() => setPanel("none"), CLOSE_MS);
   }
@@ -101,35 +101,6 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
   // Что лежит «под» перелистываемым листом
   const baseLeft = flip === "prev" ? leftOf(index - 1) : leftOf(index);
   const baseRight = flip === "next" ? rightOf(index + 1) : rightOf(index);
-
-  if (onDesk) {
-    return (
-      <div className="album vintage on-desk">
-        <div className={"spread" + (unfold ? " unfold" : "")}>
-          <Page side="left">{baseLeft}</Page>
-          <Page side="right">{baseRight}</Page>
-          {flip && <i className={`under-shade ${flip}`} />}
-          {flip === "next" && (
-            <div className="leaf leaf-right flipping-next">
-              <div className="leaf-face front"><Page side="right">{rightOf(index)}</Page><i className="leaf-shade" /></div>
-              <div className="leaf-face back"><Page side="left">{leftOf(index + 1)}</Page><i className="leaf-shade" /></div>
-            </div>
-          )}
-          {flip === "prev" && (
-            <div className="leaf leaf-left flipping-prev">
-              <div className="leaf-face front"><Page side="left">{leftOf(index)}</Page><i className="leaf-shade" /></div>
-              <div className="leaf-face back"><Page side="right">{rightOf(index - 1)}</Page><i className="leaf-shade" /></div>
-            </div>
-          )}
-          <div className="spine" />
-          {/* уголки страниц: тап — перелистнуть */}
-          <button className="corner-turn left" disabled={index === 0 || !!flip} onClick={() => go("prev")} aria-label="Назад">‹</button>
-          <button className="corner-turn right" disabled={index >= total - 1 || !!flip} onClick={() => go("next")} aria-label="Вперёд">›</button>
-        </div>
-        <button className="close" aria-label="Закрыть альбом" onClick={close}>×</button>
-      </div>
-    );
-  }
 
   if (!opened) {
     return (
