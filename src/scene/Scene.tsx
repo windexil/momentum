@@ -6,7 +6,7 @@ import { useQuality, useQualitySettings } from "./quality";
 import * as THREE from "three";
 import { Album3D } from "./Album3D";
 import { AtmosphereRig } from "./AtmosphereRig";
-import { Character } from "./Character";
+import { Character, hero } from "./Character";
 import { CameraFollow, Interact } from "./Interact";
 import { Particles } from "./Particles";
 import { PhotoStrip } from "./PhotoStrip";
@@ -137,7 +137,7 @@ function QualityRig() {
       flipflops={3}
       onDecline={() => {
         // при открытом дневнике кадров специально меньше — это не повод снижать качество
-        if (useStore.getState().panel === "none") q().decline();
+        if (useStore.getState().panel === "none" || hero.firstPerson) q().decline();
       }}
       onIncline={() => q().incline()}
       onFallback={() => useQuality.setState({ autoLevel: "medium" })}
@@ -158,7 +158,8 @@ function FrameLimiter() {
       id = requestAnimationFrame(tick);
       // пока открыт дневник, форма записи или настройки, комната почти не видна —
       // хватит 20 кадров в секунду, видеокарта и процессор отдыхают
-      const fps = useStore.getState().panel !== "none" ? 20 : 60;
+      // (за столом альбом лежит в самой сцене — там нужна полная плавность)
+      const fps = useStore.getState().panel !== "none" && !hero.firstPerson ? 20 : 60;
       if (now - last.current >= 1000 / fps - 2) {
         last.current = now;
         invalidate();

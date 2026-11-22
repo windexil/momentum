@@ -54,7 +54,7 @@ export default function App() {
         </SceneBoundary>
       )}
       {loaded && <Hud />}
-      {loaded && panel === "album" && <AlbumBook key={atDesk ? "desk" : "room"} onDesk={atDesk} />}
+      {loaded && panel === "album" && !atDesk && <AlbumBook />}
       {loaded && panel === "create" && <NewMemoryForm />}
       {loaded && panel === "custom" && <CustomizePanel />}
       {loaded && <StripEditor />}

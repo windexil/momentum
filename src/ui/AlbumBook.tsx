@@ -36,6 +36,7 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
 
   function close() {
     if (closing) return;
+    if (onDesk) return setPanel("none");
     setClosing(true);
     window.setTimeout(() => setPanel("none"), CLOSE_MS);
   }
@@ -113,9 +114,8 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
     );
   }
 
-  return (
-    <div className={"album-wrap" + (closing ? " closing" : "")} onClick={close}>
-      <div className={"album vintage" + (unfold ? " just-opened" : "")} onClick={(e) => e.stopPropagation()}>
+  const inner = (
+    <>
         <div className={"spread" + (unfold ? " unfold" : "")}>
           <Page side="left">{baseLeft}</Page>
           <Page side="right">{baseRight}</Page>
@@ -135,13 +135,21 @@ export function AlbumBook({ onDesk = false }: { onDesk?: boolean }) {
           <div className="spine" />
         </div>
         <div className="album-nav">
-          <button className="ghost" disabled={!!flip} onClick={() => (index === 0 ? setOpened(false) : go("prev"))}>
+          <button className="ghost" disabled={!!flip} onClick={() => (index === 0 ? (onDesk ? close() : setOpened(false)) : go("prev"))}>
             {index === 0 ? "← Обложка" : "← Назад"}
           </button>
           <span className="page-count">{Math.min(index + 1, total)} / {total}</span>
           <button className="ghost" disabled={index >= total - 1 || !!flip} onClick={() => go("next")}>Вперёд →</button>
         </div>
         <button className="close" aria-label="Закрыть альбом" onClick={close}>×</button>
+    </>
+  );
+  // за столом альбом лежит раскрытым на 3D-книге: тот же вид и размер, только без затемнения экрана
+  if (onDesk) return <div className="album vintage on-desk">{inner}</div>;
+  return (
+    <div className={"album-wrap" + (closing ? " closing" : "")} onClick={close}>
+      <div className={"album vintage" + (unfold ? " just-opened" : "")} onClick={(e) => e.stopPropagation()}>
+        {inner}
       </div>
     </div>
   );

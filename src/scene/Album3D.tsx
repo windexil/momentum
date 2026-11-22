@@ -3,6 +3,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import { AlbumBook } from "../ui/AlbumBook";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoom } from "../roomStore";
 import { useHeroUI } from "./heroControl";
@@ -67,6 +68,9 @@ function drawCover(canvas: HTMLCanvasElement, text: string) {
   g.fillStyle = "rgba(233,199,127,.75)";
   g.fillText("ФОТОАЛЬБОМ  ·  ВОСПОМИНАНИЯ", W / 2, H * 0.74);
 }
+
+/** половина ширины раскрытой книги и её глубина: пропорции как у страниц альбома на экране (900×560) */
+const BW = 0.45, BD = 0.56;
 
 export function Album3D() {
   const cover = useRef<THREE.Group>(null);
@@ -135,37 +139,45 @@ export function Album3D() {
     >
       {/* задняя обложка + блок страниц */}
       <mesh position={[0, 0.012, 0]} castShadow material={mats.cover}>
-        <boxGeometry args={[0.62, 0.02, 0.46]} />
+        <boxGeometry args={[BW, 0.02, BD]} />
       </mesh>
       <mesh position={[0, 0.05, 0]} castShadow material={mats.pages}>
-        <boxGeometry args={[0.59, 0.06, 0.44]} />
+        <boxGeometry args={[BW - 0.03, 0.06, BD - 0.02]} />
       </mesh>
       {/* корешок и обложка на шарнире справа */}
-      <mesh position={[0.31, 0.048, 0]} castShadow material={mats.cover}>
-        <boxGeometry args={[0.02, 0.095, 0.46]} />
+      <mesh position={[BW / 2, 0.048, 0]} castShadow material={mats.cover}>
+        <boxGeometry args={[0.02, 0.095, BD]} />
       </mesh>
-      <group ref={cover} position={[0.31, 0.087, 0]}>
-        <mesh position={[-0.31, 0, 0]} castShadow material={mats.cover}>
-          <boxGeometry args={[0.62, 0.02, 0.46]} />
+      <group ref={cover} position={[BW / 2, 0.087, 0]}>
+        <mesh position={[-BW / 2, 0, 0]} castShadow material={mats.cover}>
+          <boxGeometry args={[BW, 0.02, BD]} />
         </mesh>
         {/* кожа с тиснением и надписью */}
-        <mesh position={[-0.31, 0.0105, 0]} rotation-x={-Math.PI / 2} material={mats.coverTop}>
-          <planeGeometry args={[0.6, 0.445]} />
+        <mesh position={[-BW / 2, 0.0105, 0]} rotation-x={-Math.PI / 2} material={mats.coverTop}>
+          <planeGeometry args={[BW - 0.02, BD - 0.015]} />
         </mesh>
         {/* металлические уголки */}
-        {[[-0.6, -0.21], [-0.6, 0.21], [-0.02, -0.21], [-0.02, 0.21]].map(([x, z], i) => (
+        {[[-BW + 0.02, -BD / 2 + 0.02], [-BW + 0.02, BD / 2 - 0.02], [-0.02, -BD / 2 + 0.02], [-0.02, BD / 2 - 0.02]].map(([x, z], i) => (
           <mesh key={i} position={[x, 0.004, z]} rotation-y={Math.PI / 4} material={mats.gold}>
             <boxGeometry args={[0.05, 0.026, 0.05]} />
           </mesh>
         ))}
         {/* застёжка-ремешок */}
-        <mesh position={[-0.6, 0.0, 0]} material={mats.cover}>
+        <mesh position={[-BW + 0.02, 0.0, 0]} material={mats.cover}>
           <boxGeometry args={[0.1, 0.03, 0.07]} />
         </mesh>
-        <mesh position={[-0.64, 0.004, 0]} material={mats.gold}>
+        <mesh position={[-BW - 0.02, 0.004, 0]} material={mats.gold}>
           <boxGeometry args={[0.025, 0.035, 0.05]} />
         </mesh>
       </group>
+      {open && atDesk && (
+        // раскрытый альбом лежит прямо на книге: 900×560 px ↔ 0.9×0.56 м (масштаб 0.04 — 1 px = 1 мм)
+        <Html transform position={[BW / 2 + 0.025, 0.1, 0.035]} rotation-x={-Math.PI / 2} scale={0.04} zIndexRange={[20, 0]}>
+          <div onPointerDown={(e) => e.stopPropagation()}>
+            <AlbumBook onDesk />
+          </div>
+        </Html>
+      )}
       {hovered && !open && !atDesk && (
         <Html position={[0, 0.35, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
           <div className="tag">Альбом воспоминаний</div>

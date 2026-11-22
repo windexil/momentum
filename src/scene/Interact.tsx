@@ -123,8 +123,8 @@ const FP_EYE = new THREE.Vector3(DESK.x - 0.02, 1.5, DESK.z + 0.5);
 const FP_LOOK = new THREE.Vector3(DESK.x + 0.42, 1.55, DESK.z - 0.55);
 // Альбом открыт на столе: наклоняемся к нему и смотрим сверху
 // камера прямо над раскрытым альбомом (чуть сдвинута к себе, чтобы верх страниц был сверху экрана)
-const ALB_LOOK = new THREE.Vector3(DESK.x + 0.09, 0.9, DESK.z + 0.08);
-const ALB_EYE = new THREE.Vector3(DESK.x + 0.09, 1.76, DESK.z + 0.1);
+const ALB_LOOK = new THREE.Vector3(DESK.x + 0.005, 0.9, DESK.z + 0.12);
+const ALB_EYE = new THREE.Vector3(DESK.x + 0.005, 1.72, DESK.z + 0.14);
 // насколько можно повернуть взгляд за столом (радианы)
 const Q_DOWN = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 // влево (к окну и кровати) можно дальше, вправо — до шкафа, чтобы не смотреть «за стену»
